@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#eff8ef" />
+  <meta name="theme-color" content="#55b9e8" />
   <meta name="description" content="기상 데이터와 작물 성장 기록을 연결하는 학생용 텃밭 탐구 웹앱" />
   <title>텃밭 기후 탐구노트</title>
   <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png" />
   <style>
     :root{
       --bg:#f7f7fb;
@@ -50,10 +53,10 @@
     }
     .topbar-inner{max-width:1048px;margin:0 auto;display:flex;align-items:center;gap:12px}
     .brandmark{
-      width:42px;height:42px;border-radius:14px;display:grid;place-items:center;
-      background:linear-gradient(145deg,#e8e3ff,#dff8ef);font-size:23px;
-      box-shadow:inset 0 0 0 1px rgba(62,125,82,.10);
+      width:46px;height:46px;border-radius:15px;overflow:hidden;flex:0 0 auto;
+      background:#fff;box-shadow:0 3px 10px rgba(32,33,58,.12), inset 0 0 0 1px rgba(62,125,82,.08);
     }
+    .brandmark img{width:100%;height:100%;object-fit:cover;display:block}
     .brandtext{min-width:0}
     .brandtext strong{display:block;font-size:16px}
     .brandtext span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -348,7 +351,7 @@
 <div class="app-shell">
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brandmark">🌱</div>
+      <div class="brandmark"><img src="./icons/icon-192.png" alt="텃밭 기후 탐구노트 아이콘"></div>
       <div class="brandtext">
         <strong>텃밭 기후 탐구노트</strong>
         <span id="topProjectText">나의 작물과 날씨를 함께 관찰해요</span>
