@@ -1,0 +1,263 @@
+/* school-garden mobile balance & Korean wrapping fixes - v1.9 */
+
+html, body {
+  word-break: keep-all;
+  overflow-wrap: normal;
+  text-wrap: pretty;
+}
+
+button, label, .btn, .nav-btn, .chip, .privacy-pill,
+p, .subtle, .preview-note, .mission, .privacy-card,
+.policy-section, .dashboard-footer {
+  word-break: keep-all;
+}
+
+a, .dashboard-footer a, .policy-contact a {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.topbar-inner,
+.grid,
+.card,
+.weather-item,
+.field,
+.photo-drop,
+.photo-choice,
+.timeline-item,
+.timeline-item > *,
+.form-grid > * {
+  min-width: 0;
+}
+
+.topbar-inner { min-width: 0; }
+.brandtext { min-width: 0; flex: 1 1 auto; }
+.top-actions { flex: 0 0 auto; }
+
+.hero h1 {
+  font-size: clamp(24px, 4.6vw, 28px);
+  line-height: 1.3;
+  letter-spacing: -.025em;
+}
+.hero p {
+  font-size: 15px;
+  line-height: 1.62;
+}
+.section-title h2 {
+  font-size: clamp(18px, 4.2vw, 20px);
+  line-height: 1.35;
+  letter-spacing: -.02em;
+}
+label {
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.btn {
+  min-height: 44px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+/* 관찰 사진 선택 영역 */
+.photo-drop {
+  min-width: 0;
+}
+.photo-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 10px;
+}
+.photo-choice {
+  min-width: 0;
+  min-height: 58px;
+  padding: 13px 9px;
+  gap: 7px;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+.photo-choice .bigico {
+  flex: 0 0 auto;
+  font-size: 21px;
+}
+.photo-tools {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 14.5px;
+    line-height: 1.58;
+  }
+
+  .app-shell {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 104px;
+  }
+  .topbar {
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 10px 12px 9px;
+  }
+  .topbar-inner { gap: 9px; }
+  .brandmark {
+    width: 43px;
+    height: 43px;
+    border-radius: 13px;
+  }
+  .brandtext strong {
+    font-size: 15.5px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .brandtext span { font-size: 11.5px; }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+  .privacy-fab {
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .card {
+    padding: 15px;
+    border-radius: 20px;
+  }
+  .section-title {
+    margin: 20px 2px 8px;
+    align-items: flex-end;
+  }
+  .section-title p {
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .hero {
+    padding: 19px;
+    border-radius: 24px;
+  }
+  .hero h1 {
+    font-size: clamp(22px, 6.5vw, 25px);
+    line-height: 1.32;
+  }
+  .hero p {
+    font-size: 14px;
+    line-height: 1.58;
+  }
+  .hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hero-stat { padding: 11px; }
+  .hero-stat strong { font-size: 19px; }
+  .hero-stat span { font-size: 11.5px; }
+
+  .subtle, .preview-note {
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  input, textarea, select {
+    padding: 11px 12px;
+    border-radius: 13px;
+  }
+  input, select { min-height: 46px; }
+  textarea { min-height: 88px; }
+  .actions {
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .photo-drop {
+    padding: 14px 12px;
+    border-radius: 18px;
+    min-height: 142px;
+    gap: 7px;
+  }
+  .photo-drop #photoPlaceholder > strong {
+    display: block;
+    font-size: 16px;
+    line-height: 1.35;
+    letter-spacing: -.015em;
+  }
+  .photo-choice-grid {
+    gap: 8px;
+    max-width: none;
+  }
+  .photo-choice {
+    min-height: 54px;
+    padding: 12px 7px;
+    gap: 6px;
+    border-radius: 16px;
+    font-size: 13.5px;
+  }
+  .photo-choice .bigico { font-size: 20px; }
+  .photo-save-state {
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+
+  .weather-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .weather-item { padding: 10px; }
+  .weather-item span { font-size: 10.5px; }
+  .weather-item strong { font-size: 15px; }
+
+  .mission { padding: 14px; }
+  .bottom-nav { gap: 3px; }
+  .nav-btn {
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+  .nav-btn .ico { font-size: 20px; }
+
+  .location-search-row {
+    grid-template-columns: 1fr;
+  }
+  .location-search-row .btn { width: 100%; }
+
+  /* 개인정보 처리방침도 같은 모바일 타이포 균형 유지 */
+  .policy-modal .modal-head h2 { font-size: 21px; }
+  .policy-intro,
+  .policy-section p,
+  .policy-section li {
+    font-size: 12px;
+    line-height: 1.58;
+  }
+  .policy-section h3 { font-size: 14.5px; }
+}
+
+@media (max-width: 430px) {
+  .top-actions { gap: 5px; }
+  .privacy-fab { padding: 0 8px; }
+  .photo-choice {
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 350px) {
+  .photo-choice-grid {
+    grid-template-columns: 1fr;
+  }
+  .photo-choice { font-size: 14px; }
+  .topbar-inner { gap: 7px; }
+  .privacy-fab {
+    width: 40px;
+    padding: 0;
+    font-size: 0;
+  }
+  .privacy-fab::before {
+    content: "🔒";
+    font-size: 17px;
+  }
+}
