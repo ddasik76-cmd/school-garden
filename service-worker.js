@@ -1,5 +1,18 @@
-const CACHE = "garden-climate-journal-v6";
-const CORE = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE = "school-garden-v9";
+const BASE = "/school-garden/";
+const CORE = [
+  BASE,
+  BASE + "index.html",
+  BASE + "manifest.webmanifest?v=18",
+  BASE + "favicon.ico?v=18",
+  BASE + "favicon-32x32.png?v=18",
+  BASE + "android-chrome-192x192.png?v=18",
+  BASE + "android-chrome-512x512.png?v=18",
+  BASE + "apple-touch-icon.png?v=18",
+  BASE + "icons/icon-192-v18.png",
+  BASE + "icons/icon-512-v18.png",
+  BASE + "icons/icon-maskable-512-v18.png"
+];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
@@ -18,24 +31,25 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (url.hostname.includes("open-meteo.com")) return;
 
-  // 새 버전이 즉시 반영되도록 HTML 탐색 요청은 network-first
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
         .then(response => {
           const copy = response.clone();
-          caches.open(CACHE).then(cache => cache.put("./index.html", copy)).catch(()=>{});
+          caches.open(CACHE).then(cache => cache.put(BASE + "index.html", copy)).catch(()=>{});
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(() => caches.match(BASE + "index.html"))
     );
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(()=>{});
+      if (response && response.ok && url.origin === self.location.origin) {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(event.request, copy)).catch(()=>{});
+      }
       return response;
     }))
   );
