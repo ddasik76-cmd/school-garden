@@ -1,14 +1,14 @@
-const CACHE = "school-garden-v10";
+const CACHE = "school-garden-v11";
 const BASE = "/school-garden/";
 const CORE = [
   BASE,
   BASE + "index.html",
-  BASE + "manifest.webmanifest?v=19",
-  BASE + "favicon.ico?v=19",
-  BASE + "favicon-32x32.png?v=19",
-  BASE + "android-chrome-192x192.png?v=19",
-  BASE + "android-chrome-512x512.png?v=19",
-  BASE + "apple-touch-icon.png?v=19",
+  BASE + "manifest.webmanifest?v=20",
+  BASE + "favicon.ico?v=20",
+  BASE + "favicon-32x32.png?v=20",
+  BASE + "android-chrome-192x192.png?v=20",
+  BASE + "android-chrome-512x512.png?v=20",
+  BASE + "apple-touch-icon.png?v=20",
   BASE + "icons/icon-192-v19.png",
   BASE + "icons/icon-512-v19.png",
   BASE + "icons/icon-maskable-512-v19.png"
