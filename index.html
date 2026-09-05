@@ -6,17 +6,17 @@
   <meta name="theme-color" content="#55b9e8" />
   <meta name="description" content="기상 데이터와 작물 성장 기록을 연결하는 학생용 텃밭 탐구 웹앱" />
   <title>텃밭 기후 탐구노트</title>
-  <link rel="manifest" href="/school-garden/manifest.webmanifest?v=18" />
-  <link rel="icon" href="/school-garden/favicon.ico?v=18" sizes="any" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/school-garden/favicon-32x32.png?v=18" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/school-garden/android-chrome-192x192.png?v=18" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/school-garden/apple-touch-icon.png?v=18" />
+  <link rel="manifest" href="/school-garden/manifest.webmanifest?v=19" />
+  <link rel="icon" href="/school-garden/favicon.ico?v=19" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/school-garden/favicon-32x32.png?v=19" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/school-garden/android-chrome-192x192.png?v=19" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/school-garden/apple-touch-icon.png?v=19" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="application-name" content="텃밭탐구" />
   <meta name="apple-mobile-web-app-title" content="텃밭탐구" />
-  <meta name="msapplication-TileImage" content="/school-garden/icons/icon-192-v18.png" />
+  <meta name="msapplication-TileImage" content="/school-garden/icons/icon-192-v19.png" />
   <style>
     :root{
       --bg:#f7f7fb;
@@ -2000,7 +2000,7 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=18", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=19", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();

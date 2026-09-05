@@ -1,17 +1,17 @@
-const CACHE = "school-garden-v9";
+const CACHE = "school-garden-v10";
 const BASE = "/school-garden/";
 const CORE = [
   BASE,
   BASE + "index.html",
-  BASE + "manifest.webmanifest?v=18",
-  BASE + "favicon.ico?v=18",
-  BASE + "favicon-32x32.png?v=18",
-  BASE + "android-chrome-192x192.png?v=18",
-  BASE + "android-chrome-512x512.png?v=18",
-  BASE + "apple-touch-icon.png?v=18",
-  BASE + "icons/icon-192-v18.png",
-  BASE + "icons/icon-512-v18.png",
-  BASE + "icons/icon-maskable-512-v18.png"
+  BASE + "manifest.webmanifest?v=19",
+  BASE + "favicon.ico?v=19",
+  BASE + "favicon-32x32.png?v=19",
+  BASE + "android-chrome-192x192.png?v=19",
+  BASE + "android-chrome-512x512.png?v=19",
+  BASE + "apple-touch-icon.png?v=19",
+  BASE + "icons/icon-192-v19.png",
+  BASE + "icons/icon-512-v19.png",
+  BASE + "icons/icon-maskable-512-v19.png"
 ];
 
 self.addEventListener("install", event => {
