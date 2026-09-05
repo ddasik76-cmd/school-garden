@@ -1,0 +1,2003 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#eff8ef" />
+  <meta name="description" content="기상 데이터와 작물 성장 기록을 연결하는 학생용 텃밭 탐구 웹앱" />
+  <title>텃밭 기후 탐구노트</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <style>
+    :root{
+      --bg:#f7f7fb;
+      --surface:#ffffff;
+      --surface-2:#f1f3ff;
+      --text:#20213a;
+      --muted:#74768d;
+      --line:#e6e6f0;
+      --brand:#6957d9;
+      --brand-dark:#4f3fb2;
+      --accent:#ffb84d;
+      --mint:#4fc4a1;
+      --pink:#ff7c9f;
+      --danger:#b84545;
+      --shadow:0 8px 28px rgba(36,69,45,.09);
+      --radius:22px;
+      --radius-sm:14px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(105,87,217,.12), transparent 26%),
+        radial-gradient(circle at 88% 12%, rgba(79,196,161,.11), transparent 24%),
+        var(--bg);
+      font-family: "Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+      line-height:1.55;
+    }
+    button,input,textarea,select{font:inherit}
+    button{cursor:pointer}
+    img{max-width:100%;display:block}
+    .app-shell{max-width:1080px;margin:0 auto;padding:0 16px 110px}
+    .topbar{
+      position:sticky;top:0;z-index:30;
+      backdrop-filter:blur(16px);
+      background:rgba(245,247,241,.88);
+      border-bottom:1px solid rgba(223,231,220,.75);
+      margin:0 -16px 18px;padding:12px 16px;
+    }
+    .topbar-inner{max-width:1048px;margin:0 auto;display:flex;align-items:center;gap:12px}
+    .brandmark{
+      width:42px;height:42px;border-radius:14px;display:grid;place-items:center;
+      background:linear-gradient(145deg,#e8e3ff,#dff8ef);font-size:23px;
+      box-shadow:inset 0 0 0 1px rgba(62,125,82,.10);
+    }
+    .brandtext{min-width:0}
+    .brandtext strong{display:block;font-size:16px}
+    .brandtext span{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .top-actions{margin-left:auto;display:flex;gap:8px}
+    .icon-btn{
+      width:42px;height:42px;border:1px solid var(--line);border-radius:14px;background:var(--surface);
+      display:grid;place-items:center;font-size:18px;color:var(--text)
+    }
+    .page{display:none;animation:fade .18s ease}
+    .page.active{display:block}
+    @keyframes fade{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:none}}
+    .hero{
+      background:linear-gradient(135deg,#5543c8 0%,#7263df 52%,#4ebba0 125%);
+      color:#fff;border-radius:30px;padding:24px;box-shadow:var(--shadow);
+      position:relative;overflow:hidden;margin-bottom:16px;
+    }
+    .hero:after{
+      content:"🌿";position:absolute;right:-10px;bottom:-38px;font-size:130px;opacity:.14;transform:rotate(-14deg)
+    }
+    .eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.82}
+    .hero h1{font-size:28px;line-height:1.25;margin:8px 0 6px;max-width:650px}
+    .hero p{margin:0;opacity:.9;max-width:680px}
+    .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:18px;position:relative;z-index:1}
+    .hero-stat{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.13);border-radius:16px;padding:12px}
+    .hero-stat strong{display:block;font-size:20px}
+    .hero-stat span{font-size:12px;opacity:.85}
+    .grid{display:grid;gap:14px}
+    .grid.two{grid-template-columns:1fr 1fr}
+    .grid.three{grid-template-columns:repeat(3,1fr)}
+    .card{
+      background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+      box-shadow:0 3px 16px rgba(36,69,45,.035);padding:18px;
+    }
+    .card h2,.card h3{margin:0 0 8px}
+    .card h2{font-size:19px}
+    .card h3{font-size:16px}
+    .subtle{color:var(--muted);font-size:13px}
+    .section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 2px 10px}
+    .section-title h2{font-size:20px;margin:0}
+    .section-title p{margin:2px 0 0;color:var(--muted);font-size:13px}
+    .weather-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px}
+    .weather-item{background:var(--surface-2);border-radius:14px;padding:11px}
+    .weather-item span{display:block;font-size:11px;color:var(--muted)}
+    .weather-item strong{display:block;font-size:16px;margin-top:2px}
+    .progress-wrap{margin-top:14px}
+    .progress-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+    .progress{height:10px;background:#e6ece3;border-radius:999px;overflow:hidden}
+    .progress > div{height:100%;background:linear-gradient(90deg,var(--brand),var(--mint));width:0;border-radius:inherit;transition:width .35s ease}
+    .virtual-plant{display:flex;align-items:center;gap:14px}
+    .plant-emoji{
+      width:74px;height:74px;border-radius:22px;background:#eff6e8;display:grid;place-items:center;
+      font-size:42px;border:1px solid #dce8d5
+    }
+    .mission{
+      background:linear-gradient(130deg,#fff3d8,#fff9ee);
+      border:1px solid #f4d697;border-radius:20px;padding:16px;position:relative;overflow:hidden
+    }
+    .mission:after{content:"★";position:absolute;right:14px;top:6px;font-size:44px;opacity:.10;transform:rotate(16deg)}
+    .mission strong{display:block;margin-bottom:5px}
+    .badge-row{display:flex;gap:8px;overflow-x:auto;padding:3px 0 6px;scrollbar-width:thin}
+    .badge{
+      min-width:112px;border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff;text-align:center
+    }
+    .badge.locked{opacity:.4;filter:grayscale(1)}
+    .badge .emoji{font-size:27px}
+    .badge strong{display:block;font-size:12px;margin-top:5px}
+    .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field.full{grid-column:1/-1}
+    label{font-size:13px;font-weight:700}
+    input,textarea,select{
+      width:100%;border:1px solid #ced9cc;background:#fff;border-radius:14px;padding:12px 13px;color:var(--text);outline:none;
+      transition:border .15s, box-shadow .15s
+    }
+    input:focus,textarea:focus,select:focus{border-color:#72a37b;box-shadow:0 0 0 3px rgba(62,125,82,.12)}
+    textarea{min-height:92px;resize:vertical}
+    .btn{
+      border:0;border-radius:14px;padding:11px 15px;font-weight:800;background:var(--brand);color:#fff;
+      display:inline-flex;align-items:center;justify-content:center;gap:7px
+    }
+    .btn:hover{filter:brightness(.98)}
+    .btn.secondary{background:#edf3ea;color:var(--brand-dark)}
+    .btn.outline{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .btn.danger{background:#fff0f0;color:var(--danger);border:1px solid #f0caca}
+    .btn.small{padding:8px 11px;border-radius:11px;font-size:12px}
+    .btn.block{width:100%}
+    .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+    .photo-drop{
+      border:2px dashed #cbd9c7;border-radius:20px;padding:18px;text-align:center;background:#fafcf8;
+      min-height:150px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px
+    }
+    .photo-drop img{max-height:280px;border-radius:16px;margin:auto}
+    .photo-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:520px;margin-top:8px}
+    .photo-choice{border:1px solid #dddcef;background:#fff;border-radius:18px;padding:14px 12px;font-weight:800;color:var(--text);display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 5px 16px rgba(49,45,100,.05)}
+    .photo-choice.camera{background:linear-gradient(135deg,#eeeaff,#f7f5ff);border-color:#d8d0ff;color:#5543c8}
+    .photo-choice.gallery{background:linear-gradient(135deg,#eafaf4,#f7fffb);border-color:#c9ecdf;color:#247e68}
+    .photo-choice .bigico{font-size:22px}
+    .photo-tools{display:flex;gap:8px;justify-content:center;margin-top:10px}
+    .photo-save-state{margin-top:10px;padding:9px 11px;border-radius:12px;background:#f3f4fb;font-size:12px;color:var(--muted);display:none}
+    .photo-save-state.show{display:block}
+    .photo-save-state.ok{background:#eaf8f2;color:#24705b}
+    .photo-save-state.error{background:#fff0f3;color:#a43e58}
+    .privacy-card{background:linear-gradient(135deg,#f2efff,#edf9f5);border:1px solid #dddaf6;border-radius:20px;padding:16px}
+    .privacy-list{margin:8px 0 0;padding-left:19px;color:var(--muted);font-size:13px}
+    .privacy-list li{margin:6px 0}
+    .privacy-pill{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e1e0ef;border-radius:999px;padding:6px 9px;font-size:11px;font-weight:800;margin:3px}
+    .setup-consent{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#faf9ff;border:1px solid #e5e1fb}
+    .setup-consent input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
+    .privacy-fab{font-size:12px;font-weight:800;width:auto;padding:0 12px;gap:5px}
+    .location-search-row{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .location-search-status{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45}
+    .location-search-status.ok{color:#24705b}
+    .location-search-status.error{color:#a43e58}
+    .location-coords{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+    .location-coords input{background:#f7f8fb;color:#6d7480}
+    .dashboard-footer{margin-top:26px;padding:18px 12px 6px;border-top:1px solid var(--line);text-align:center;color:#7b827d;font-size:10.5px;line-height:1.65}
+    .dashboard-footer .maker{font-weight:800;color:#59615b}
+    .dashboard-footer a{color:#6d58c8;text-decoration:none}
+    .dashboard-footer .footer-guide{margin-top:4px}
+    /* 개인정보 처리방침은 긴 문서를 모바일에서도 한눈에 많이 볼 수 있도록 집약형으로 표시 */
+    .policy-modal{width:min(700px,calc(100% - 12px));max-height:min(92dvh,920px);display:flex;flex-direction:column;padding:0;overflow:hidden}
+    .policy-modal .modal-head{padding:18px 16px 10px;margin:0;border-bottom:1px solid #eceef1;flex:0 0 auto}
+    .policy-modal .modal-head h2{font-size:24px;line-height:1.2;letter-spacing:-.03em}
+    .policy-modal .modal-head .eyebrow{font-size:10px}
+    .policy-body{padding:0 16px 10px;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;scrollbar-gutter:stable}
+    .policy-intro{font-size:12.5px;color:#606a78;line-height:1.62;padding:10px 0 3px}
+    .policy-section{padding:11px 0;border-top:1px solid #e3e5e8}
+    .policy-section:first-of-type{border-top:0}
+    .policy-section h3{font-size:15.5px;line-height:1.35;margin:0 0 6px;color:#171a1f;letter-spacing:-.02em}
+    .policy-section p,.policy-section li{font-size:12.5px;line-height:1.62;color:#5d6775;margin:3px 0}
+    .policy-section ul{margin:4px 0 0;padding-left:17px}
+    .policy-contact{background:#f7f8fb;border-radius:12px;padding:9px 11px;margin-top:7px;font-size:12.5px;line-height:1.55}
+    .policy-contact strong{color:#444d5c}
+    .policy-contact a{color:#c13878}
+    .policy-date{text-align:right;color:#7c838d;font-size:11.5px;margin-top:8px}
+    .policy-actions{padding:8px 16px 10px;background:#fff;border-top:1px solid #eceef1;display:flex;justify-content:flex-end;flex:0 0 auto}
+    .policy-confirm{min-width:106px;border:0;border-radius:13px;padding:10px 18px;color:#fff;font-weight:900;font-size:14px;background:linear-gradient(135deg,#ff8c27,#f01c84,#6d45e7);box-shadow:0 7px 18px rgba(224,42,126,.18)}
+    .preview-note{font-size:12px;color:var(--muted)}
+    .status{
+      border-radius:14px;padding:10px 12px;font-size:13px;margin-top:10px;display:none
+    }
+    .status.show{display:block}
+    .status.ok{background:#edf8ef;color:#285f3b}
+    .status.warn{background:#fff5dd;color:#775b13}
+    .status.error{background:#fff0f0;color:#943d3d}
+    .timeline{display:grid;gap:12px}
+    .timeline-item{
+      display:grid;grid-template-columns:112px 1fr;gap:14px;background:#fff;border:1px solid var(--line);
+      border-radius:20px;padding:14px
+    }
+    .timeline-photo{
+      aspect-ratio:1/1;background:#edf1ea;border-radius:15px;overflow:hidden;display:grid;place-items:center;color:var(--muted)
+    }
+    .timeline-photo img{width:100%;height:100%;object-fit:cover}
+    .timeline-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+    .timeline-head strong{font-size:15px}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+    .chip{font-size:11px;background:#eff4ed;border-radius:999px;padding:5px 8px;color:#45634b}
+    .empty{
+      padding:36px 20px;text-align:center;color:var(--muted);background:#fafcf9;border:1px dashed #cad6c7;border-radius:20px
+    }
+    .chart-wrap{position:relative;height:330px}
+    .reflection-card{border-left:5px solid #8ea96a}
+    .prompt{background:#f6f8f2;border-radius:14px;padding:11px;margin-bottom:7px;font-size:13px}
+    /* A4 탐구보고서: 화면 미리보기와 PDF/인쇄가 같은 판형을 사용합니다. */
+    .report-preview{
+      background:#e8eaf0;border:1px solid var(--line);border-radius:24px;padding:18px;
+      overflow-x:auto;display:flex;flex-direction:column;align-items:center;gap:18px
+    }
+    .report-page{
+      width:794px;height:1123px;flex:0 0 auto;background:#fff;color:#1d2430;
+      padding:44px 50px 42px;box-shadow:0 8px 28px rgba(28,35,46,.12);
+      font-size:13.5px;line-height:1.42;position:relative;overflow:hidden
+    }
+    .report-page *{box-sizing:border-box}
+    .report-page h1{font-size:23px;line-height:1.22;margin:0;color:#182033;letter-spacing:-.02em}
+    .report-page h2{font-size:17px;line-height:1.3;margin:0 0 9px;color:#182033}
+    .report-page h3{font-size:14.5px;line-height:1.35;margin:0 0 6px;color:#252d3d}
+    .report-page p{margin:4px 0}
+    .report-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border-bottom:2px solid #20283a;padding-bottom:12px;margin-bottom:14px}
+    .report-head-meta{text-align:right;font-size:12.5px;color:#626b78;line-height:1.5}
+    .report-kicker{font-size:11px;font-weight:900;letter-spacing:.08em;color:#6c58c8;margin-bottom:4px}
+    .report-section{border-top:1px solid #dfe3e8;padding-top:10px;margin-top:11px}
+    .report-section:first-of-type{border-top:0;padding-top:0;margin-top:0}
+    .report-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .report-info-box{border:1px solid #dfe3e8;border-radius:10px;padding:9px 10px;background:#fbfcfd}
+    .report-info-row{display:grid;grid-template-columns:86px 1fr;gap:8px;padding:2px 0}
+    .report-info-row b{color:#4d5665}
+    .report-weather{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+    .report-stat{border:1px solid #dfe3e8;border-radius:9px;padding:7px 8px;background:#f8fafb}
+    .report-stat span{display:block;font-size:10.5px;color:#6e7785;margin-bottom:2px}
+    .report-stat strong{font-size:13.5px;color:#273044}
+    .report-chart{width:100%;height:225px;object-fit:contain;border:1px solid #e1e5ea;border-radius:9px;background:#fff;padding:4px}
+    .report-photo-compare{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+     .report-photo-card{border:1px solid #dfe3e8;border-radius:9px;overflow:hidden;background:#fff}
+    .report-photo-frame{width:100%;aspect-ratio:4/3;background:#f3f5f7;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .report-photo-frame img{width:100%;height:100%;object-fit:contain;display:block}
+    .report-photo-card .report-photo-meta{padding:5px 7px;font-size:11.5px;color:#4d5665}
+    .report-photo-empty{width:100%;aspect-ratio:4/3;display:grid;place-items:center;color:#8a929d;background:#f3f5f7}
+    .report-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12.8px;line-height:1.32}
+    .report-table th,.report-table td{border:1px solid #dfe3e8;padding:5px 6px;vertical-align:top;word-break:break-word}
+    .report-table th{background:#f2f4f7;font-size:12px;color:#465063;text-align:left}
+    .report-table .num{text-align:center;white-space:nowrap}
+     .report-thumb{width:58px;height:44px;object-fit:contain;background:#f3f5f7;border-radius:6px;display:block;margin:auto}
+     .report-thumb-empty{width:58px;height:44px;border-radius:6px;background:#f0f2f4;display:grid;place-items:center;color:#8a929d;font-size:10px;margin:auto}
+    .report-reflection{border:1px solid #dfe3e8;border-radius:10px;padding:9px 10px;margin-bottom:8px;break-inside:avoid}
+    .report-reflection .date{font-weight:800;color:#545ec4;margin-bottom:4px}
+    .report-reflection-grid{display:grid;grid-template-columns:84px 1fr;gap:4px 8px}
+    .report-reflection-grid b{color:#596273}
+    .report-badges{display:flex;flex-wrap:wrap;gap:5px}
+    .report-badge{font-size:11.5px;border:1px solid #d9ddea;border-radius:999px;padding:3px 7px;background:#f8f7ff}
+    .report-foot{position:absolute;left:50px;right:50px;bottom:18px;display:flex;justify-content:space-between;border-top:1px solid #e2e5e9;padding-top:6px;font-size:10.5px;color:#858c96}
+    .report-note{font-size:11px;color:#757e8a}
+    .report-compact-list{margin:4px 0 0;padding-left:18px}
+    .report-compact-list li{margin:2px 0}
+    .report-page-number{font-weight:700;color:#596273}
+    @page{size:A4 portrait;margin:0}
+    @media print{
+      body{background:#fff!important}
+      body *{visibility:hidden!important}
+      #reportPreview,#reportPreview *{visibility:visible!important}
+      #reportPreview{position:absolute;left:0;top:0;width:210mm!important;margin:0!important;padding:0!important;background:#fff!important;border:0!important;border-radius:0!important;display:block!important;overflow:visible!important}
+      .report-page{width:210mm!important;height:297mm!important;box-shadow:none!important;margin:0!important;break-after:page;page-break-after:always}
+      .report-page:last-child{break-after:auto;page-break-after:auto}
+    }
+    .privacy-note{background:#f0f5ef;border-radius:16px;padding:14px;font-size:12px;color:#526257}
+    .bottom-nav{
+      position:fixed;z-index:40;left:50%;transform:translateX(-50%);bottom:0;
+      width:min(100%,1080px);padding:8px max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+      background:rgba(255,255,255,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line);
+      display:grid;grid-template-columns:repeat(5,1fr);gap:5px
+    }
+    .nav-btn{border:0;background:transparent;border-radius:14px;padding:7px 3px;color:#758078;font-size:11px;font-weight:700}
+    .nav-btn .ico{display:block;font-size:21px;line-height:1.15;margin-bottom:2px}
+    .nav-btn.active{background:#edf5ea;color:var(--brand-dark)}
+    .modal-backdrop{
+      position:fixed;z-index:100;inset:0;background:rgba(15,31,20,.48);display:none;padding:18px;overflow:auto
+    }
+    .modal-backdrop.show{display:flex}
+    .modal{
+      width:min(680px,100%);margin:auto;background:#fff;border-radius:28px;padding:22px;box-shadow:0 24px 70px rgba(10,28,17,.24)
+    }
+    .modal-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+    .modal-head h2{margin:0}
+    .modal-head button{margin-left:auto}
+    .toast{
+      position:fixed;z-index:150;left:50%;bottom:92px;transform:translate(-50%,20px);background:#183022;color:white;
+      border-radius:14px;padding:11px 15px;opacity:0;pointer-events:none;transition:.2s;max-width:90%;font-size:13px
+    }
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+    .danger-zone{border:1px solid #edcccc;background:#fff8f8}
+    .hide{display:none!important}
+    .kbd{font-size:11px;border:1px solid #d8dfd6;background:#fafbfa;border-radius:6px;padding:1px 5px}
+    @media(max-width:760px){
+      .grid.two,.grid.three,.form-grid{grid-template-columns:1fr}
+      .field.full{grid-column:auto}
+      .hero{padding:20px;border-radius:24px}
+      .hero h1{font-size:24px}
+      .hero-stats{grid-template-columns:repeat(2,1fr)}
+      .weather-grid{grid-template-columns:repeat(2,1fr)}
+      .weather-item:last-child{grid-column:1/-1}
+      .timeline-item{grid-template-columns:86px 1fr}
+      .location-search-row{grid-template-columns:1fr}
+      .location-search-row .btn{width:100%}
+      .report-photos{grid-template-columns:repeat(2,1fr)}
+      .chart-wrap{height:280px}
+      .modal-backdrop:has(.policy-modal){padding:6px}
+      .policy-modal{width:100%;max-height:94dvh;border-radius:22px}
+      .policy-modal .modal-head{padding:14px 12px 8px}
+      .policy-modal .modal-head h2{font-size:21px}
+      .policy-modal .modal-head .icon-btn{width:38px;height:38px;border-radius:12px}
+      .policy-body{padding:0 12px 8px}
+      .policy-intro{font-size:12px;line-height:1.58;padding:8px 0 2px}
+      .policy-section{padding:9px 0}
+      .policy-section h3{font-size:14.5px;margin-bottom:5px}
+      .policy-section p,.policy-section li{font-size:12px;line-height:1.58;margin:2.5px 0}
+      .policy-section ul{padding-left:16px}
+      .policy-contact{padding:8px 10px;font-size:12px}
+      .policy-actions{padding:7px 12px 9px}
+      .policy-confirm{min-width:96px;padding:9px 16px;font-size:13.5px}
+    }
+    @media(max-width:430px){
+      .app-shell{padding-left:12px;padding-right:12px}
+      .topbar{margin-left:-12px;margin-right:-12px}
+      .hero-stats{grid-template-columns:repeat(2,1fr)}
+      .timeline-item{grid-template-columns:1fr}
+      .timeline-photo{aspect-ratio:4/3}
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brandmark">🌱</div>
+      <div class="brandtext">
+        <strong>텃밭 기후 탐구노트</strong>
+        <span id="topProjectText">나의 작물과 날씨를 함께 관찰해요</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn privacy-fab" id="privacyBtn" aria-label="개인정보 안내">🔒 안내</button>
+        <button class="icon-btn" id="settingsBtn" aria-label="설정">⚙️</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="page-home" class="page active">
+      <div class="hero">
+        <div class="eyebrow">MY GARDEN LAB</div>
+        <h1><span id="heroCrop">작물</span>과 날씨의 관계를 직접 발견해 보세요.</h1>
+        <p id="heroSub">사진을 찍고, 측정하고, 생각을 남기면 한 학기 탐구보고서가 완성됩니다.</p>
+        <div class="hero-stats">
+          <div class="hero-stat"><strong id="statDays">0</strong><span>재배 일수</span></div>
+          <div class="hero-stat"><strong id="statObs">0</strong><span>관찰 기록</span></div>
+          <div class="hero-stat"><strong id="statPhotos">0</strong><span>사진</span></div>
+          <div class="hero-stat"><strong id="statPoints">0</strong><span>새싹 포인트</span></div>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <div class="card">
+          <div class="virtual-plant">
+            <div class="plant-emoji" id="plantEmoji">🌰</div>
+            <div>
+              <div class="subtle">나의 가상 텃밭</div>
+              <h2 id="plantLevelName">씨앗 관찰자</h2>
+              <div class="subtle" id="plantLevelDesc">첫 관찰을 시작해 보세요.</div>
+            </div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-head"><span>다음 단계까지</span><strong id="progressText">0 / 100</strong></div>
+            <div class="progress"><div id="progressBar"></div></div>
+          </div>
+        </div>
+
+        <div class="mission">
+          <span class="eyebrow" style="color:#96721d">TODAY'S MISSION</span>
+          <strong id="missionTitle">🔍 오늘의 작은 미션</strong>
+          <div id="missionText">지난 관찰 사진과 비교해 달라진 점을 하나 찾아보세요.</div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <div><h2>오늘의 날씨</h2><p>설정한 텃밭 위치 기준</p></div>
+        <button class="btn small secondary" id="refreshTodayWeather">새로고침</button>
+      </div>
+      <div class="card">
+        <div id="todayWeatherStatus" class="subtle">날씨를 불러오려면 설정에서 위치를 확인하세요.</div>
+        <div class="weather-grid">
+          <div class="weather-item"><span>평균기온</span><strong id="wMean">-</strong></div>
+          <div class="weather-item"><span>최고기온</span><strong id="wMax">-</strong></div>
+          <div class="weather-item"><span>최저기온</span><strong id="wMin">-</strong></div>
+          <div class="weather-item"><span>강수량</span><strong id="wRain">-</strong></div>
+          <div class="weather-item"><span>일조시간</span><strong id="wSun">-</strong></div>
+        </div>
+      </div>
+
+      <div class="section-title"><div><h2>내가 모은 탐구 배지</h2><p>기록의 양보다 다양한 탐구 행동을 응원합니다.</p></div></div>
+      <div class="badge-row" id="badgeRow"></div>
+
+      <div class="section-title"><div><h2>최근 관찰</h2><p>시간의 흐름에 따라 무엇이 달라졌을까요?</p></div></div>
+      <div id="homeRecent" class="timeline"></div>
+
+      <footer class="dashboard-footer">
+        <div class="maker">만든 사람 이 제중 · 팔봉중학교</div>
+        <div>문의 <a href="mailto:ddasik7@hanmail.net">ddasik7@hanmail.net</a> · Instagram <a href="https://www.instagram.com/aijinro" target="_blank" rel="noopener">@aijinro</a></div>
+        <div class="footer-guide">무료 교육용 웹앱 · 학생 기록과 사진은 운영자 서버에 저장하지 않습니다.<br>기기 변경·브라우저 데이터 삭제 전 ZIP 백업을 권장합니다. · <button type="button" id="footerPrivacyBtn" style="border:0;background:none;padding:0;color:#6d58c8;font-size:inherit;text-decoration:underline">개인정보 처리방침</button></div>
+      </footer>
+    </section>
+
+    <section id="page-observe" class="page">
+      <div class="section-title"><div><h2>📷 오늘 관찰하기</h2><p>사진 + 측정 + 생각을 한 번에 기록합니다.</p></div></div>
+
+      <div class="card">
+        <form id="observationForm">
+          <input type="hidden" id="obsId">
+          <div class="form-grid">
+            <div class="field">
+              <label for="obsDate">관찰 날짜</label>
+              <input id="obsDate" type="date" required>
+            </div>
+            <div class="field">
+              <label>날씨 자동 입력</label>
+              <button type="button" class="btn secondary" id="fetchObsWeather">이 날짜 날씨 가져오기</button>
+            </div>
+
+            <div class="field full">
+              <div class="photo-drop">
+                <div id="photoPlaceholder">
+                  <div style="font-size:38px">📸</div>
+                  <strong>오늘의 작물을 사진으로 남겨 보세요</strong>
+                  <div class="preview-note">카메라로 바로 찍거나, 기기에 저장된 사진을 고를 수 있어요.</div>
+                  <div class="photo-choice-grid">
+                    <label class="photo-choice camera" for="cameraInput"><span class="bigico">📷</span> 바로 촬영</label>
+                    <label class="photo-choice gallery" for="galleryInput"><span class="bigico">🖼️</span> 앨범에서 선택</label>
+                  </div>
+                </div>
+                <img id="photoPreview" class="hide" alt="선택한 작물 사진 미리보기">
+                <div id="photoTools" class="photo-tools hide">
+                  <label class="btn small secondary" for="cameraInput">다시 촬영</label>
+                  <label class="btn small outline" for="galleryInput">다른 사진</label>
+                  <button class="btn small danger" id="removeSelectedPhoto" type="button">사진 빼기</button>
+                </div>
+                <input id="cameraInput" class="hide" type="file" accept="image/*" capture="environment">
+                <input id="galleryInput" class="hide" type="file" accept="image/*">
+              </div>
+              <div id="photoSaveState" class="photo-save-state"></div>
+              <div class="preview-note">🔒 사진은 크기를 줄인 뒤 이 기기의 IndexedDB에만 저장합니다. 서버에는 업로드하지 않습니다. 사람 얼굴·이름표가 나오지 않도록 작물 중심으로 촬영해 주세요.</div>
+            </div>
+
+            <div class="field"><label for="heightCm">키 (cm)</label><input id="heightCm" type="number" step="0.1" min="0" placeholder="예: 23.5"></div>
+            <div class="field"><label for="leafCount">잎 수</label><input id="leafCount" type="number" min="0" placeholder="예: 12"></div>
+            <div class="field"><label for="flowerCount">꽃 수</label><input id="flowerCount" type="number" min="0" placeholder="예: 2"></div>
+            <div class="field"><label for="fruitCount">열매 수</label><input id="fruitCount" type="number" min="0" placeholder="예: 0"></div>
+
+            <div class="field">
+              <label for="soilState">토양 상태</label>
+              <select id="soilState"><option value="">선택</option><option>건조함</option><option>적당함</option><option>촉촉함</option><option>매우 젖음</option></select>
+            </div>
+            <div class="field">
+              <label for="watered">물주기</label>
+              <select id="watered"><option value="">선택</option><option value="yes">물을 줌</option><option value="no">물을 주지 않음</option></select>
+            </div>
+            <div class="field">
+              <label for="pest">병충해/곤충</label>
+              <input id="pest" type="text" placeholder="예: 진딧물, 나비, 이상 없음">
+            </div>
+            <div class="field">
+              <label for="changeKeyword">오늘의 발견</label>
+              <input id="changeKeyword" type="text" placeholder="예: 새잎, 첫 꽃, 시듦">
+            </div>
+            <div class="field full">
+              <label for="obsNote">이전 관찰과 비교해 달라진 점</label>
+              <textarea id="obsNote" placeholder="눈으로 본 변화와 측정한 수치를 함께 써 보세요."></textarea>
+            </div>
+            <div class="field full">
+              <label for="weatherThought">날씨가 영향을 주었을까요?</label>
+              <textarea id="weatherThought" placeholder="기온·비·일조량 중 어떤 요소가 영향을 주었을지 근거와 함께 생각해 보세요."></textarea>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px;background:#f8faf6">
+            <h3>자동 입력된 기상 데이터</h3>
+            <div class="weather-grid">
+              <div class="weather-item"><span>평균</span><strong id="owMean">-</strong></div>
+              <div class="weather-item"><span>최고</span><strong id="owMax">-</strong></div>
+              <div class="weather-item"><span>최저</span><strong id="owMin">-</strong></div>
+              <div class="weather-item"><span>강수</span><strong id="owRain">-</strong></div>
+              <div class="weather-item"><span>일조</span><strong id="owSun">-</strong></div>
+            </div>
+          </div>
+
+          <div id="obsStatus" class="status"></div>
+          <div class="actions">
+            <button class="btn" type="submit">🌱 관찰 기록 저장</button>
+            <button class="btn outline hide" id="cancelEditBtn" type="button">수정 취소</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-title"><div><h2>관찰 타임라인</h2><p>내가 저장한 기록은 이 기기에서만 수정·삭제할 수 있습니다.</p></div></div>
+      <div id="observationTimeline" class="timeline"></div>
+    </section>
+
+    <section id="page-growth" class="page">
+      <div class="section-title"><div><h2>📊 성장과 날씨 비교</h2><p>측정값과 기상 데이터를 같은 시간축에서 살펴봅니다.</p></div></div>
+      <div class="card">
+        <div class="chart-wrap"><canvas id="growthChart"></canvas></div>
+      </div>
+
+      <div class="grid two" style="margin-top:14px">
+        <div class="card">
+          <h3>작물의 적정 조건</h3>
+          <div id="cropConditionSummary" class="subtle">설정에서 적정 성장조건을 입력해 주세요.</div>
+        </div>
+        <div class="card">
+          <h3>데이터로 생각해 보기</h3>
+          <div id="dataInsight" class="subtle">관찰 기록이 2회 이상 쌓이면 비교 질문이 나타납니다.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-reflect" class="page">
+      <div class="section-title"><div><h2>💭 주간 성찰</h2><p>관찰 → 증거 → 추론 → 다음 질문으로 생각을 깊게 만듭니다.</p></div></div>
+      <div class="card reflection-card">
+        <form id="reflectionForm">
+          <div class="field">
+            <label for="reflectDate">성찰 날짜</label>
+            <input id="reflectDate" type="date" required>
+          </div>
+          <div style="height:12px"></div>
+          <div class="prompt"><strong>① 관찰</strong> 이번 주 작물에서 가장 눈에 띄는 변화는 무엇인가요?</div>
+          <textarea id="rObserve"></textarea>
+          <div class="prompt"><strong>② 증거</strong> 그렇게 판단한 사진·측정값·날씨 자료는 무엇인가요?</div>
+          <textarea id="rEvidence"></textarea>
+          <div class="prompt"><strong>③ 추론</strong> 이번 주 날씨 중 어떤 요소가 영향을 주었을까요?</div>
+          <textarea id="rInfer"></textarea>
+          <div class="prompt"><strong>④ 다른 가능성</strong> 날씨 외에 영향을 주었을 것은 무엇일까요?</div>
+          <textarea id="rOther"></textarea>
+          <div class="prompt"><strong>⑤ 다음 관찰</strong> 다음에는 무엇을 집중해서 보고 싶나요?</div>
+          <textarea id="rNext"></textarea>
+          <div class="prompt"><strong>⑥ 기후변화 관점</strong> 이번 관찰만으로 기후변화의 영향이라고 말할 수 있을까요? 어떤 자료가 더 필요할까요?</div>
+          <textarea id="rClimate"></textarea>
+          <div class="actions"><button class="btn" type="submit">🧠 성찰 저장 (+20P)</button></div>
+        </form>
+      </div>
+      <div class="section-title"><div><h2>나의 성찰 기록</h2></div></div>
+      <div id="reflectionList" class="timeline"></div>
+    </section>
+
+    <section id="page-report" class="page">
+      <div class="section-title"><div><h2>📖 텃밭 탐구보고서</h2><p>한 학기 동안의 기록을 모아 PDF로 저장합니다.</p></div></div>
+
+      <div class="grid two">
+        <div class="card">
+          <h3>A4 최종 탐구보고서</h3>
+          <p class="subtle">A4 세로 판형, 본문 10~12pt 기준으로 사진·기상 데이터·성장 그래프·관찰·성찰을 집약해 정리합니다.</p>
+          <div class="actions">
+            <button class="btn" id="generatePdfBtn">PDF 다운로드</button>
+            <button class="btn outline" id="printReportBtn" type="button">A4 인쇄</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>기기 변경을 위한 ZIP 백업</h3>
+          <p class="subtle">텍스트 기록과 모든 사진을 ZIP 하나에 넣어 저장하고 새 기기에서 그대로 복원할 수 있습니다.</p>
+          <div class="actions">
+            <button class="btn secondary" id="backupZipBtn">ZIP 백업</button>
+            <label class="btn outline" for="restoreZipInput">ZIP 복원</label>
+            <input id="restoreZipInput" class="hide" type="file" accept=".zip,application/zip">
+          </div>
+          <div class="subtle" id="backupInfo" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div class="section-title"><div><h2>A4 보고서 미리보기</h2><p>화면에서도 실제 A4 한 페이지 단위로 확인할 수 있습니다.</p></div></div>
+      <div class="report-preview" id="reportPreview">
+        <div class="empty">관찰 기록을 저장하면 보고서 미리보기가 만들어집니다.</div>
+      </div>
+
+      <div class="section-title"><div><h2>데이터 관리</h2></div></div>
+      <div class="card">
+        <div class="privacy-card">
+          <strong>🔒 개인정보·사진은 이렇게 다룹니다</strong>
+          <div style="margin-top:8px">
+            <span class="privacy-pill">회원가입 없음</span><span class="privacy-pill">학생 DB 없음</span><span class="privacy-pill">사진 서버 전송 없음</span><span class="privacy-pill">앱 자체 광고·분석 없음</span>
+          </div>
+          <ul class="privacy-list">
+            <li>작물 정보·관찰·성찰은 이 브라우저의 <strong>localStorage</strong>에 저장됩니다.</li>
+            <li>사진은 압축 후 이 브라우저의 <strong>IndexedDB</strong>에 저장됩니다.</li>
+            <li>날씨 조회에는 설정한 텃밭의 위도·경도와 조회 날짜가 외부 날씨 서비스로 전송됩니다. 호스팅·CDN 사업자는 일반적인 접속정보를 처리할 수 있습니다.</li>
+            <li>브라우저 데이터 삭제·기기 교체 전에 <strong>ZIP 백업</strong>을 받아야 기록을 안전하게 옮길 수 있습니다.</li>
+            <li>사진에는 학생 얼굴, 이름표, 개인 연락처 등 개인을 알아볼 수 있는 정보가 나오지 않도록 합니다.</li>
+          </ul>
+          <button class="btn small outline" id="privacyDetailBtn" type="button">개인정보 처리 안내 자세히 보기</button>
+        </div>
+      </div>
+      <div class="card danger-zone" style="margin-top:12px">
+        <h3>모든 데이터 삭제</h3>
+        <p class="subtle">학기 종료 후 이 기기에 남아 있는 작물 정보, 관찰, 성찰, 사진을 모두 삭제합니다. 먼저 PDF와 ZIP 백업을 확인하세요.</p>
+        <button class="btn danger" id="deleteAllBtn">이 기기의 텃밭 데이터 모두 삭제</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<nav class="bottom-nav" aria-label="주요 메뉴">
+  <button class="nav-btn active" data-page="home"><span class="ico">🏠</span>텃밭</button>
+  <button class="nav-btn" data-page="observe"><span class="ico">📷</span>관찰</button>
+  <button class="nav-btn" data-page="growth"><span class="ico">📊</span>성장</button>
+  <button class="nav-btn" data-page="reflect"><span class="ico">💭</span>생각</button>
+  <button class="nav-btn" data-page="report"><span class="ico">📖</span>보고서</button>
+</nav>
+
+<div class="modal-backdrop" id="setupModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" style="color:var(--brand)">PROJECT SETUP</div>
+        <h2>나의 텃밭 프로젝트 설정</h2>
+        <div class="subtle">학생 개인정보를 최소화하려면 이름 대신 별칭을 사용해도 됩니다.</div>
+      </div>
+      <button class="icon-btn" id="closeSetupBtn" type="button">✕</button>
+    </div>
+    <form id="setupForm">
+      <div class="form-grid">
+        <div class="field"><label for="studentName">이름/별칭</label><input id="studentName" placeholder="예: 초록이"></div>
+        <div class="field"><label for="studentClass">학년·반/모둠</label><input id="studentClass" placeholder="예: 2학년 1반 3모둠"></div>
+        <div class="field"><label for="cropName">작물명 *</label><input id="cropName" required placeholder="예: 토마토"></div>
+        <div class="field"><label for="variety">품종</label><input id="variety" placeholder="예: 방울토마토"></div>
+        <div class="field"><label for="plantDate">파종/정식일 *</label><input id="plantDate" type="date" required></div>
+        <div class="field full">
+          <label for="gardenPlace">텃밭 지역 *</label>
+          <div class="location-search-row">
+            <input id="gardenPlace" required placeholder="예: 서울특별시, 대전광역시, 제주특별자치도 제주시">
+            <button class="btn secondary" type="button" id="searchPlaceBtn">🔎 지역 찾기</button>
+          </div>
+          <div id="placeSearchStatus" class="location-search-status">지역명을 입력한 뒤 ‘지역 찾기’를 누르면 날씨 조회용 좌표가 자동 입력됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다.</div>
+          <div class="location-coords">
+            <input id="latitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 위도" placeholder="위도">
+            <input id="longitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 경도" placeholder="경도">
+          </div>
+        </div>
+        <div class="field"><label for="tempMin">적정 최저기온(℃)</label><input id="tempMin" type="number" step="0.1" placeholder="20"></div>
+        <div class="field"><label for="tempMax">적정 최고기온(℃)</label><input id="tempMax" type="number" step="0.1" placeholder="27"></div>
+        <div class="field"><label for="sunHours">적정 일조시간(시간/일)</label><input id="sunHours" type="number" step="0.1" placeholder="6"></div>
+        <div class="field"><label for="rainWeekly">적정 강수/물 요구량(mm/주, 선택)</label><input id="rainWeekly" type="number" step="0.1" placeholder="25"></div>
+        <div class="field full"><label for="cropNotes">작물 성장조건 조사 메모</label><textarea id="cropNotes" placeholder="적정 토양, 물주기, 특징 등을 조사해 기록하세요."></textarea></div>
+      </div>
+      <div class="privacy-card" style="margin-top:12px">
+        <strong>🔒 저장 전 확인</strong>
+        <ul class="privacy-list">
+          <li>학생의 기록과 사진은 서버가 아니라 현재 기기 브라우저에 저장됩니다.</li>
+          <li>날씨 조회 시 학생이 직접 설정한 텃밭 지역의 좌표와 날짜만 Open‑Meteo로 전송됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다.</li>
+          <li>공용기기에서는 사용 후 반드시 PDF/ZIP 백업 뒤 데이터를 삭제하세요.</li>
+        </ul>
+        <label class="setup-consent">
+          <input type="checkbox" id="privacyAck" required>
+          <span>위 내용을 확인했습니다. 사진에는 얼굴·이름표 등 불필요한 개인정보가 나오지 않도록 촬영하겠습니다.</span>
+        </label>
+      </div>
+      <div class="actions"><button class="btn" type="submit">내 텃밭 시작하기</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="privacyModal">
+  <div class="modal policy-modal">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" style="color:var(--brand)">PRIVACY POLICY</div>
+        <h2>개인정보 처리방침</h2>
+      </div>
+      <button class="icon-btn" id="closePrivacyBtn" type="button" aria-label="닫기">✕</button>
+    </div>
+    <div class="policy-body">
+      <div class="policy-intro">「텃밭 기후 탐구노트」(이하 “서비스”)는 이용자의 개인정보를 중요하게 생각하며 「개인정보 보호법」 등 관련 법령과 학교 현장의 개인정보 보호 원칙을 고려하여 운영합니다.</div>
+
+      <section class="policy-section">
+        <h3>제1조 개인정보의 처리 목적</h3>
+        <p>본 서비스는 중학생 등이 작물의 성장과 날씨를 관찰·기록하고 기후변화와 생태를 탐구할 수 있도록 제공되는 무료 교육용 웹앱입니다.</p>
+        <p>회원가입 기능을 제공하지 않으며, 서비스 개발자는 이용자의 이름, 학교, 학년, 학번, 연락처, 이메일 등의 개인정보를 별도의 서버에 수집·저장하지 않습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제2조 처리하는 정보의 항목</h3>
+        <p>서비스 개발자가 이용자의 개인정보를 서버를 통해 직접 수집하거나 저장하지 않습니다.</p>
+        <p>이용자가 앱에 입력하는 다음 정보는 이용자의 기기 웹브라우저 저장공간에만 저장됩니다.</p>
+        <ul>
+          <li>선택 입력한 이름 또는 별칭, 학년·반·모둠 정보</li>
+          <li>작물명, 품종, 재배 시작일, 작물 성장조건</li>
+          <li>텃밭 지역명과 날씨 조회를 위해 변환된 지역 좌표</li>
+          <li>날짜별 관찰·측정값·성찰 기록</li>
+          <li>이용자가 촬영하거나 선택한 작물 사진</li>
+        </ul>
+        <p>텍스트 정보는 localStorage, 사진은 IndexedDB에 저장되며 운영자 서버로 업로드하지 않습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제3조 정보의 보유 및 이용 기간</h3>
+        <p>서비스 운영자는 이용자가 입력한 관찰·사진 데이터를 서버에 보유하지 않습니다.</p>
+        <p>기기에 저장된 정보는 이용자가 앱의 삭제 기능을 실행하거나 웹브라우저의 사이트 데이터·저장정보를 삭제할 때까지 해당 기기에 남아 있을 수 있습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제4조 개인정보의 제3자 제공</h3>
+        <p>서비스 개발자는 이용자의 이름, 사진, 관찰 및 성찰 기록을 수집하지 않으며 제3자에게 제공하지 않습니다.</p>
+        <p>날씨 기능을 이용할 때에는 이용자가 지정한 <strong>텃밭 지역의 좌표와 조회 날짜</strong>가 Open‑Meteo에 전송됩니다. 학생 이름·사진·관찰 내용은 날씨 요청에 포함하지 않으며 개인의 현재 위치(GPS)는 사용하지 않습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제5조 개인정보 처리의 위탁</h3>
+        <p>서비스 개발자는 별도로 수집한 학생 개인정보 처리업무를 외부 기관 또는 업체에 위탁하지 않습니다.</p>
+        <p>다만 웹앱 제공과 기능 구현을 위해 GitHub Pages, jsDelivr, Open‑Meteo와 같은 외부 서비스를 이용하며, 각 서비스가 접속 과정에서 처리하는 정보는 해당 사업자의 개인정보 처리방침 및 정책에 따릅니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제6조 만 14세 미만 이용자의 개인정보 보호</h3>
+        <p>본 서비스는 중학생 등 만 14세 미만의 이용자가 사용할 수 있습니다. 회원가입을 요구하지 않으며 이름·연락처·이메일·학번 등의 개인정보를 필수로 요구하지 않습니다.</p>
+        <p>학교 수업에서 사용할 경우 학교의 학습지원 소프트웨어 선정 절차, 개인정보 보호 지침, 사진·초상권 관련 안내 및 필요한 동의 절차를 담당 교사가 확인하여 운영해야 합니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제7조 이용자의 정보 삭제 및 관리</h3>
+        <p>이용자가 입력한 정보는 이용자의 기기에 저장됩니다. 이용자는 앱의 ‘모든 데이터 삭제’ 기능 또는 웹브라우저의 사이트 데이터 삭제 기능을 이용하여 자신의 데이터를 직접 삭제할 수 있습니다.</p>
+        <p>기기를 변경하는 경우 서비스가 제공하는 ZIP 백업과 복원 기능을 이용하여 이용자가 직접 데이터를 이전할 수 있습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제8조 개인정보의 안전성 확보 조치</h3>
+        <p>서비스는 학생의 관찰 기록과 사진을 별도의 운영자 서버에 저장하지 않는 방식으로 개인정보 노출 가능성을 최소화합니다.</p>
+        <p>사진은 기기의 IndexedDB에 저장되며 운영자가 이를 열람하거나 관리할 수 없습니다. 사진에는 얼굴, 명찰, 학번, 연락처 등 개인을 알아볼 수 있는 정보가 포함되지 않도록 안내합니다.</p>
+        <p>ZIP 백업파일은 이용자의 기기에 다운로드되므로 분실·공유에 주의해야 하며, 공용기기에서는 백업 후 기기 내 데이터를 삭제하는 것을 권장합니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제9조 외부 서비스 이용</h3>
+        <p>본 서비스는 웹앱 제공과 기능 구현을 위해 다음 서비스를 이용할 수 있습니다.</p>
+        <ul>
+          <li>GitHub Pages: 웹앱 파일 제공</li>
+          <li>jsDelivr: Chart.js, JSZip, html2canvas, jsPDF 등 라이브러리 제공</li>
+          <li>Open‑Meteo: 지역 검색 및 날씨 데이터 조회</li>
+        </ul>
+        <p>이들 서비스는 접속 과정에서 IP 주소, 접속 시각, 브라우저·기기 정보 등의 기술적 정보를 각 서비스의 정책에 따라 자동 처리할 수 있습니다. 서비스 개발자는 이러한 정보를 학생의 관찰기록이나 성적정보와 결합하여 학생 개인을 식별하는 데 사용하지 않습니다.</p>
+      </section>
+
+      <section class="policy-section">
+        <h3>제10조 개인정보 관련 문의</h3>
+        <p>서비스의 개인정보 보호 및 데이터 처리 구조에 관한 문의는 아래 채널을 통해 할 수 있습니다.</p>
+        <div class="policy-contact">
+          <div><strong>서비스명:</strong> 텃밭 기후 탐구노트</div>
+          <div><strong>개발자:</strong> 이 제중</div>
+          <div><strong>소속:</strong> 팔봉중학교</div>
+          <div><strong>이메일:</strong> <a href="mailto:ddasik7@hanmail.net">ddasik7@hanmail.net</a></div>
+          <div><strong>Instagram:</strong> <a href="https://www.instagram.com/aijinro" target="_blank" rel="noopener">@aijinro</a></div>
+        </div>
+      </section>
+
+      <section class="policy-section">
+        <h3>제11조 개인정보 처리방침의 변경</h3>
+        <p>본 개인정보 처리방침은 관련 법령, 학교 운영 기준 또는 서비스 기능의 변경에 따라 수정될 수 있으며, 중요한 변경이 있는 경우 서비스 화면 등을 통해 안내합니다.</p>
+        <div class="policy-date">시행일: 2026년 9월 5일</div>
+      </section>
+    </div>
+    <div class="policy-actions"><button class="policy-confirm" id="privacyConfirmBtn" type="button">확인</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+
+<script>
+(() => {
+  "use strict";
+
+  const APP_VERSION = "1.5.0";
+  const STORAGE_KEY = "gardenClimateJournal.v1";
+  const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
+  const DB_NAME = "gardenClimateJournalDB";
+  const DB_VERSION = 1;
+  const PHOTO_STORE = "photos";
+
+  const missions = [
+    "지난 관찰 사진과 비교해 달라진 점을 하나 찾아보세요.",
+    "잎 하나를 자세히 보고 색·모양·크기의 변화를 기록해 보세요.",
+    "최근 3일 중 가장 더웠던 날을 찾아 작물 변화와 연결해 보세요.",
+    "비가 온 전후 사진을 비교해 달라진 점을 찾아보세요.",
+    "오늘 작물에게 한 가지 질문을 한다면 무엇을 묻고 싶은가요?",
+    "날씨 말고 성장에 영향을 줄 수 있는 요인을 하나 찾아보세요.",
+    "키만 보지 말고 잎·꽃·열매 중 하나를 집중해서 관찰해 보세요."
+  ];
+
+  const badgeDefinitions = [
+    { id:"first", emoji:"🌱", name:"첫 관찰", test:d=>d.observations.length>=1 },
+    { id:"photo5", emoji:"📷", name:"변화 포착자", test:d=>d.observations.filter(x=>x.photoId).length>=5 },
+    { id:"measure5", emoji:"📏", name:"꼼꼼한 측정가", test:d=>d.observations.filter(x=>num(x.heightCm)!=null || num(x.leafCount)!=null).length>=5 },
+    { id:"weather3", emoji:"☀️", name:"날씨 탐정", test:d=>d.observations.filter(x=>x.weatherThought && x.weatherThought.trim().length>=10).length>=3 },
+    { id:"rain", emoji:"🌧️", name:"비 관찰자", test:d=>d.observations.some(x=>num(x.weather?.rain)>0 && x.note?.trim()) },
+    { id:"question", emoji:"❓", name:"질문하는 과학자", test:d=>d.reflections.some(x=>x.next?.trim().length>=10) },
+    { id:"data", emoji:"📊", name:"데이터 탐험가", test:d=>d.observations.filter(x=>num(x.heightCm)!=null).length>=3 },
+    { id:"reflect3", emoji:"🧠", name:"깊은 생각", test:d=>d.reflections.length>=3 },
+    { id:"climate", emoji:"🌍", name:"기후 탐구자", test:d=>d.reflections.some(x=>x.climate?.trim().length>=20) },
+    { id:"report", emoji:"🏆", name:"텃밭 연구자", test:d=>d.reportGenerated===true }
+  ];
+
+  const levels = [
+    {min:0, max:49, name:"씨앗 관찰자", emoji:"🌰", desc:"첫 관찰을 시작해 보세요."},
+    {min:50, max:119, name:"새싹 관찰자", emoji:"🌱", desc:"작은 변화를 발견하기 시작했어요."},
+    {min:120, max:219, name:"변화 발견자", emoji:"🌿", desc:"시간에 따른 차이가 보이기 시작합니다."},
+    {min:220, max:349, name:"날씨 탐정", emoji:"🪴", desc:"날씨와 성장의 관계를 추적하고 있어요."},
+    {min:350, max:499, name:"데이터 탐험가", emoji:"🌼", desc:"측정값과 증거로 설명할 수 있어요."},
+    {min:500, max:99999, name:"텃밭 연구자", emoji:"🍅", desc:"한 학기의 탐구를 스스로 정리할 수 있어요."}
+  ];
+
+  let state = loadState();
+  let dbPromise = openDB();
+  let selectedPhotoBlob = null;
+  let removePhotoOnSave = false;
+  let currentWeatherForObservation = null;
+  let growthChart = null;
+
+  function defaultState(){
+    return {
+      version: APP_VERSION,
+      project: {
+        studentName:"",
+        studentClass:"",
+        cropName:"",
+        variety:"",
+        plantDate:"",
+        gardenPlace:"",
+        tempMin:"",
+        tempMax:"",
+        sunHours:"",
+        rainWeekly:"",
+        latitude:null,
+        longitude:null,
+        locationConfirmed:false,
+        cropNotes:""
+      },
+      observations:[],
+      reflections:[],
+      reportGenerated:false,
+      createdAt:new Date().toISOString(),
+      updatedAt:new Date().toISOString()
+    };
+  }
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      const mergedProject=Object.assign(defaultState().project, parsed.project||{});
+      // v1.3까지 앱에 들어 있던 서산 기본값은 새 버전에서 자동 위치로 간주하지 않습니다.
+      // 사용자가 직접 지역을 검색·확정하도록 하여 전국 어디서나 동일하게 사용합니다.
+      if(!mergedProject.locationConfirmed && mergedProject.gardenPlace==="충남 서산시" && Number(mergedProject.latitude)===36.7845 && Number(mergedProject.longitude)===126.4503){
+        mergedProject.gardenPlace=""; mergedProject.latitude=null; mergedProject.longitude=null;
+      }
+      return Object.assign(defaultState(), parsed, {
+        project:mergedProject,
+        observations:Array.isArray(parsed.observations)?parsed.observations:[],
+        reflections:Array.isArray(parsed.reflections)?parsed.reflections:[]
+      });
+    }catch(e){
+      console.error(e);
+      return defaultState();
+    }
+  }
+
+  function saveState(){
+    state.updatedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    renderAll();
+  }
+
+  function num(v){
+    if(v===null || v===undefined || v==="") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function fmt(n, digits=1){
+    const x = num(n);
+    return x===null ? "-" : x.toFixed(digits).replace(/\.0$/,"");
+  }
+
+  function todayStr(){
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+
+  function uid(prefix="id"){
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+  }
+
+  function esc(s=""){
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+  }
+
+  function openDB(){
+    return new Promise((resolve,reject)=>{
+      const req = indexedDB.open(DB_NAME,DB_VERSION);
+      req.onupgradeneeded = e=>{
+        const db=e.target.result;
+        if(!db.objectStoreNames.contains(PHOTO_STORE)){
+          db.createObjectStore(PHOTO_STORE,{keyPath:"id"});
+        }
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+
+  async function photoPut(id, blob){
+    const db=await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(PHOTO_STORE,"readwrite");
+      tx.objectStore(PHOTO_STORE).put({id,blob,updatedAt:new Date().toISOString()});
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+  }
+
+  async function photoGet(id){
+    if(!id) return null;
+    const db=await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction(PHOTO_STORE,"readonly").objectStore(PHOTO_STORE).get(id);
+      req.onsuccess=()=>resolve(req.result?.blob||null);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+
+  async function photoDelete(id){
+    if(!id) return;
+    const db=await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(PHOTO_STORE,"readwrite");
+      tx.objectStore(PHOTO_STORE).delete(id);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+  }
+
+  async function photoClear(){
+    const db=await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx=db.transaction(PHOTO_STORE,"readwrite");
+      tx.objectStore(PHOTO_STORE).clear();
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    });
+  }
+
+  async function allPhotos(){
+    const db=await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const req=db.transaction(PHOTO_STORE,"readonly").objectStore(PHOTO_STORE).getAll();
+      req.onsuccess=()=>resolve(req.result||[]);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+
+  async function compressImage(file, maxSide=1600, quality=.80){
+    if(!file) return null;
+    if(!file.type || !file.type.startsWith("image/")) throw new Error("이미지 파일만 선택할 수 있습니다.");
+
+    let source=null, width=0, height=0, cleanup=()=>{};
+    try{
+      if("createImageBitmap" in window){
+        try{
+          source=await createImageBitmap(file, {imageOrientation:"from-image"});
+          width=source.width; height=source.height;
+          cleanup=()=>source.close?.();
+        }catch(bitmapError){
+          console.warn("createImageBitmap fallback", bitmapError);
+        }
+      }
+      if(!source){
+        const objectUrl=URL.createObjectURL(file);
+        const img=await new Promise((resolve,reject)=>{
+          const el=new Image();
+          el.onload=()=>resolve(el);
+          el.onerror=()=>reject(new Error("이 사진 형식을 브라우저에서 읽지 못했습니다."));
+          el.src=objectUrl;
+        });
+        source=img; width=img.naturalWidth; height=img.naturalHeight;
+        cleanup=()=>URL.revokeObjectURL(objectUrl);
+      }
+      if(!width || !height) throw new Error("사진 크기를 확인하지 못했습니다.");
+      const scale=Math.min(1,maxSide/Math.max(width,height));
+      const outW=Math.max(1,Math.round(width*scale));
+      const outH=Math.max(1,Math.round(height*scale));
+      const canvas=document.createElement("canvas");
+      canvas.width=outW; canvas.height=outH;
+      const ctx=canvas.getContext("2d",{alpha:false});
+      ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,outW,outH);
+      ctx.drawImage(source,0,0,outW,outH);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",quality));
+      if(!blob || blob.size===0) throw new Error("사진 압축 결과를 만들지 못했습니다.");
+      return blob;
+    }finally{ cleanup(); }
+  }
+
+  async function requestPersistentStorage(){
+    try{
+      if(navigator.storage?.persist){
+        const persisted=await navigator.storage.persist();
+        return persisted;
+      }
+    }catch(e){ console.warn("persistent storage request failed",e); }
+    return false;
+  }
+
+  async function verifyPhotoSaved(id){
+    const saved=await photoGet(id);
+    return !!(saved && saved.size>0);
+  }
+
+  async function blobURL(id){
+    const blob=await photoGet(id);
+    return blob ? URL.createObjectURL(blob) : "";
+  }
+
+  function calcPoints(){
+    let pts=0;
+    for(const o of state.observations){
+      pts += 10;
+      if(o.photoId && o.note?.trim()) pts += 5;
+      if(num(o.heightCm)!=null || num(o.leafCount)!=null || num(o.flowerCount)!=null || num(o.fruitCount)!=null) pts += 5;
+      if(o.weatherThought?.trim().length>=10) pts += 10;
+      if(o.changeKeyword?.trim()) pts += 5;
+    }
+    pts += state.reflections.length*20;
+    return pts;
+  }
+
+  function getUnlockedBadges(){
+    return badgeDefinitions.filter(b=>b.test(state));
+  }
+
+  function dayDiff(from,to=new Date()){
+    if(!from) return 0;
+    const a = new Date(from+"T00:00:00");
+    const b = to instanceof Date ? to : new Date(to);
+    const diff = Math.floor((new Date(b.getFullYear(),b.getMonth(),b.getDate())-a)/(1000*60*60*24))+1;
+    return Math.max(0,diff);
+  }
+
+  function currentLevel(points){
+    return levels.find(l=>points>=l.min && points<=l.max) || levels[levels.length-1];
+  }
+
+  function levelProgress(points, lvl){
+    if(lvl===levels[levels.length-1]) return {pct:100,text:`${points}P`};
+    const span=lvl.max-lvl.min+1;
+    const got=Math.max(0,points-lvl.min);
+    return {pct:Math.min(100,got/span*100),text:`${got} / ${span}P`};
+  }
+
+  function toast(msg){
+    const el=document.getElementById("toast");
+    el.textContent=msg; el.classList.add("show");
+    clearTimeout(toast.timer);
+    toast.timer=setTimeout(()=>el.classList.remove("show"),2200);
+  }
+
+  function setStatus(id,msg,type="ok"){
+    const el=document.getElementById(id);
+    el.textContent=msg;
+    el.className=`status show ${type}`;
+  }
+
+  function showPage(name){
+    document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===`page-${name}`));
+    document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
+    if(name==="growth") renderGrowth();
+    if(name==="report") renderReportPreview();
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  async function searchGardenPlace(){
+    const input=document.getElementById("gardenPlace");
+    const status=document.getElementById("placeSearchStatus");
+    const latEl=document.getElementById("latitude"), lonEl=document.getElementById("longitude");
+    const query=input.value.trim();
+    if(query.length<2){
+      status.textContent="지역명을 2글자 이상 입력해 주세요."; status.className="location-search-status error"; return;
+    }
+    status.textContent="지역을 찾는 중입니다…"; status.className="location-search-status";
+    try{
+      const params=new URLSearchParams({name:query,count:"5",language:"ko",format:"json"});
+      const res=await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
+      if(!res.ok) throw new Error("지역 검색 서비스에 연결하지 못했습니다.");
+      const data=await res.json();
+      const result=data.results?.[0];
+      if(!result) throw new Error("검색 결과가 없습니다. 시·군·구 또는 도시 이름을 다시 입력해 주세요.");
+      const label=[result.name,result.admin2,result.admin1].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(" ");
+      input.value=label || query;
+      input.dataset.resolvedName=input.value;
+      latEl.value=Number(result.latitude).toFixed(4);
+      lonEl.value=Number(result.longitude).toFixed(4);
+      status.textContent=`✅ ${input.value} · 날씨 조회 위치 설정 완료`; status.className="location-search-status ok";
+    }catch(err){
+      console.error(err); latEl.value=""; lonEl.value=""; input.dataset.resolvedName="";
+      status.textContent=`❌ ${err.message}`; status.className="location-search-status error";
+    }
+  }
+
+  async function fetchWeather(date){
+    const lat=num(state.project.latitude), lon=num(state.project.longitude);
+    if(lat===null || lon===null) throw new Error("설정에서 텃밭 지역을 검색해 날씨 조회 위치를 먼저 설정해 주세요.");
+    const today=todayStr();
+    let base="https://api.open-meteo.com/v1/forecast";
+    const dDate=new Date(date+"T00:00:00"), dToday=new Date(today+"T00:00:00");
+    const daysAgo=Math.round((dToday-dDate)/(86400000));
+    if(daysAgo>90){
+      base="https://archive-api.open-meteo.com/v1/archive";
+    }
+    const params=new URLSearchParams({
+      latitude:String(lat), longitude:String(lon),
+      start_date:date, end_date:date,
+      daily:"temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration",
+      timezone:"Asia/Seoul"
+    });
+    const res=await fetch(`${base}?${params}`);
+    if(!res.ok) throw new Error("기상 데이터를 불러오지 못했습니다.");
+    const json=await res.json();
+    if(!json.daily?.time?.length) throw new Error("해당 날짜의 기상 데이터가 아직 없습니다.");
+    return {
+      date,
+      mean:num(json.daily.temperature_2m_mean?.[0]),
+      max:num(json.daily.temperature_2m_max?.[0]),
+      min:num(json.daily.temperature_2m_min?.[0]),
+      rain:num(json.daily.precipitation_sum?.[0]),
+      sun:num(json.daily.sunshine_duration?.[0])===null?null:num(json.daily.sunshine_duration?.[0])/3600,
+      source:"Open-Meteo"
+    };
+  }
+
+  function renderWeatherTo(prefix,w){
+    const map={Mean:"mean",Max:"max",Min:"min",Rain:"rain",Sun:"sun"};
+    Object.entries(map).forEach(([suffix,key])=>{
+      const el=document.getElementById(prefix+suffix);
+      if(!el) return;
+      const val=w?.[key];
+      if(val===null || val===undefined){ el.textContent="-"; return; }
+      el.textContent = key==="rain" ? `${fmt(val)} mm` : key==="sun" ? `${fmt(val)} h` : `${fmt(val)}℃`;
+    });
+  }
+
+  async function renderTimeline(containerId, list, limit=null){
+    const el=document.getElementById(containerId);
+    const arr=[...list].sort((a,b)=>b.date.localeCompare(a.date));
+    const visible=limit?arr.slice(0,limit):arr;
+    if(!visible.length){ el.innerHTML='<div class="empty">아직 기록이 없습니다. 첫 관찰을 시작해 보세요. 🌱</div>'; return; }
+    el.innerHTML="";
+    for(const o of visible){
+      const photoUrl=o.photoId ? await blobURL(o.photoId) : "";
+      const weather=o.weather||{};
+      const div=document.createElement("div");
+      div.className="timeline-item";
+      div.innerHTML=`
+        <div class="timeline-photo">${photoUrl?`<img src="${photoUrl}" alt="${esc(o.date)} 작물 사진">`:"📷 사진 없음"}</div>
+        <div>
+          <div class="timeline-head">
+            <div><strong>${esc(o.date)} ${o.changeKeyword?`· ${esc(o.changeKeyword)}`:""}</strong>
+              <div class="subtle">${weather.mean!=null?`평균 ${fmt(weather.mean)}℃ · 강수 ${fmt(weather.rain)}mm · 일조 ${fmt(weather.sun)}h`:"기상 데이터 없음"}</div>
+            </div>
+            ${containerId==="observationTimeline"?`<div class="actions" style="margin:0">
+              <button class="btn small outline edit-observation" data-id="${o.id}">수정</button>
+              <button class="btn small danger delete-observation" data-id="${o.id}">삭제</button>
+            </div>`:""}
+          </div>
+          <div class="chips">
+            ${num(o.heightCm)!=null?`<span class="chip">키 ${fmt(o.heightCm)}cm</span>`:""}
+            ${num(o.leafCount)!=null?`<span class="chip">잎 ${fmt(o.leafCount,0)}개</span>`:""}
+            ${num(o.flowerCount)!=null?`<span class="chip">꽃 ${fmt(o.flowerCount,0)}개</span>`:""}
+            ${num(o.fruitCount)!=null?`<span class="chip">열매 ${fmt(o.fruitCount,0)}개</span>`:""}
+            ${o.soilState?`<span class="chip">토양 ${esc(o.soilState)}</span>`:""}
+          </div>
+          ${o.note?`<div>${esc(o.note)}</div>`:""}
+          ${o.weatherThought?`<div class="subtle" style="margin-top:6px">💭 ${esc(o.weatherThought)}</div>`:""}
+        </div>`;
+      el.appendChild(div);
+    }
+  }
+
+  function renderBadges(){
+    const unlocked=new Set(getUnlockedBadges().map(x=>x.id));
+    document.getElementById("badgeRow").innerHTML=badgeDefinitions.map(b=>`
+      <div class="badge ${unlocked.has(b.id)?"":"locked"}">
+        <div class="emoji">${b.emoji}</div><strong>${esc(b.name)}</strong>
+        <div class="subtle">${unlocked.has(b.id)?"획득!":"아직 잠김"}</div>
+      </div>`).join("");
+  }
+
+  async function renderHome(){
+    const p=state.project, points=calcPoints(), lvl=currentLevel(points), prog=levelProgress(points,lvl);
+    document.getElementById("heroCrop").textContent=p.cropName||"작물";
+    document.getElementById("topProjectText").textContent=p.cropName?`${p.cropName}${p.variety?` · ${p.variety}`:""} · ${p.gardenPlace||"텃밭"}`:"나의 작물과 날씨를 함께 관찰해요";
+    document.getElementById("statDays").textContent=dayDiff(p.plantDate);
+    document.getElementById("statObs").textContent=state.observations.length;
+    document.getElementById("statPhotos").textContent=state.observations.filter(x=>x.photoId).length;
+    document.getElementById("statPoints").textContent=points;
+    document.getElementById("plantEmoji").textContent=lvl.emoji;
+    document.getElementById("plantLevelName").textContent=lvl.name;
+    document.getElementById("plantLevelDesc").textContent=lvl.desc;
+    document.getElementById("progressText").textContent=prog.text;
+    document.getElementById("progressBar").style.width=`${prog.pct}%`;
+    const idx=Math.abs(new Date().getDate()+state.observations.length)%missions.length;
+    document.getElementById("missionText").textContent=missions[idx];
+    renderBadges();
+    renderTimeline("homeRecent",state.observations,3);
+  }
+
+  async function renderObservations(){
+    renderTimeline("observationTimeline",state.observations);
+  }
+
+  function renderReflections(){
+    const el=document.getElementById("reflectionList");
+    const arr=[...state.reflections].sort((a,b)=>b.date.localeCompare(a.date));
+    if(!arr.length){el.innerHTML='<div class="empty">아직 성찰 기록이 없습니다. 한 주의 관찰을 돌아보세요.</div>';return;}
+    el.innerHTML=arr.map(r=>`
+      <div class="timeline-item">
+        <div class="timeline-photo" style="font-size:36px">🧠</div>
+        <div>
+          <div class="timeline-head"><strong>${esc(r.date)}</strong><button class="btn small danger delete-reflection" data-id="${r.id}">삭제</button></div>
+          ${r.observe?`<div><strong>관찰:</strong> ${esc(r.observe)}</div>`:""}
+          ${r.evidence?`<div class="subtle"><strong>증거:</strong> ${esc(r.evidence)}</div>`:""}
+          ${r.infer?`<div class="subtle"><strong>추론:</strong> ${esc(r.infer)}</div>`:""}
+          ${r.next?`<div class="subtle"><strong>다음 질문:</strong> ${esc(r.next)}</div>`:""}
+        </div>
+      </div>`).join("");
+  }
+
+  function renderGrowth(){
+    const obs=[...state.observations].sort((a,b)=>a.date.localeCompare(b.date));
+    const labels=obs.map(x=>x.date.slice(5));
+    const heights=obs.map(x=>num(x.heightCm));
+    const means=obs.map(x=>num(x.weather?.mean));
+    const rain=obs.map(x=>num(x.weather?.rain));
+
+    const ctx=document.getElementById("growthChart");
+    if(growthChart) growthChart.destroy();
+    growthChart=new Chart(ctx,{
+      type:"line",
+      data:{
+        labels,
+        datasets:[
+          {label:"작물 키(cm)",data:heights,yAxisID:"y",tension:.3,spanGaps:true},
+          {label:"평균기온(℃)",data:means,yAxisID:"y1",tension:.3,spanGaps:true},
+          {label:"강수량(mm)",data:rain,yAxisID:"y1",type:"bar"}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:"index",intersect:false},
+        plugins:{legend:{position:"bottom"}},
+        scales:{
+          y:{position:"left",title:{display:true,text:"작물 키(cm)"},beginAtZero:true},
+          y1:{position:"right",title:{display:true,text:"기상 데이터"},grid:{drawOnChartArea:false},beginAtZero:true}
+        }
+      }
+    });
+
+    const p=state.project;
+    document.getElementById("cropConditionSummary").innerHTML=`
+      <div class="chips">
+        ${p.tempMin!==""&&p.tempMax!==""?`<span class="chip">적정기온 ${esc(p.tempMin)}~${esc(p.tempMax)}℃</span>`:""}
+        ${p.sunHours!==""?`<span class="chip">일조 ${esc(p.sunHours)}h/일 이상</span>`:""}
+        ${p.rainWeekly!==""?`<span class="chip">물·강수 ${esc(p.rainWeekly)}mm/주</span>`:""}
+      </div>
+      <div>${p.cropNotes?esc(p.cropNotes):"설정에서 조사한 성장조건을 입력하면 이곳에 표시됩니다."}</div>`;
+
+    let insight="관찰 기록이 2회 이상 쌓이면 비교 질문이 나타납니다.";
+    if(obs.length>=2){
+      const validHeights=obs.filter(x=>num(x.heightCm)!=null);
+      const first=validHeights[0], last=validHeights[validHeights.length-1];
+      const change=first&&last?num(last.heightCm)-num(first.heightCm):null;
+      const recent=obs.slice(-3);
+      const avgTemp=recent.map(x=>num(x.weather?.mean)).filter(x=>x!=null);
+      const avg=avgTemp.length?avgTemp.reduce((a,b)=>a+b,0)/avgTemp.length:null;
+      insight=`최근 관찰 ${recent.length}회의 평균기온은 <strong>${avg==null?"-":fmt(avg)+"℃"}</strong>입니다.
+      ${change!=null?`첫 측정 이후 키는 <strong>${fmt(change)}cm</strong> 변했습니다. `:""}
+      두 변화가 함께 나타났다고 해서 바로 원인이라고 단정할 수 있을까요? 물주기·토양·병충해 같은 다른 조건도 함께 비교해 보세요.`;
+    }
+    document.getElementById("dataInsight").innerHTML=insight;
+  }
+
+  function chunkArray(items, size){
+    const out=[];
+    for(let i=0;i<items.length;i+=size) out.push(items.slice(i,i+size));
+    return out;
+  }
+
+  async function makeReportChartDataUrl(obs){
+    const valid=obs.filter(o=>num(o.heightCm)!=null || num(o.weather?.mean)!=null || num(o.weather?.rain)!=null);
+    if(!valid.length) return "";
+    const canvas=document.createElement("canvas");
+    canvas.width=1200; canvas.height=390;
+    const chart=new Chart(canvas.getContext("2d"),{
+      type:"line",
+      data:{
+        labels:valid.map(x=>x.date.slice(5)),
+        datasets:[
+          {label:"작물 키(cm)",data:valid.map(x=>num(x.heightCm)),yAxisID:"y",tension:.28,spanGaps:true,borderWidth:3,pointRadius:3},
+          {label:"평균기온(℃)",data:valid.map(x=>num(x.weather?.mean)),yAxisID:"y1",tension:.28,spanGaps:true,borderWidth:2,pointRadius:2},
+          {label:"강수량(mm)",data:valid.map(x=>num(x.weather?.rain)),yAxisID:"y1",type:"bar",borderWidth:0}
+        ]
+      },
+      options:{
+        responsive:false,animation:false,devicePixelRatio:2,
+        layout:{padding:{left:6,right:8,top:5,bottom:0}},
+        plugins:{
+          legend:{position:"bottom",labels:{boxWidth:18,boxHeight:8,font:{size:16},padding:16}},
+          title:{display:false}
+        },
+        scales:{
+          x:{ticks:{font:{size:14},maxRotation:0,autoSkip:true,maxTicksLimit:12},grid:{display:false}},
+          y:{position:"left",beginAtZero:true,title:{display:true,text:"작물 키(cm)",font:{size:14}},ticks:{font:{size:13}}},
+          y1:{position:"right",beginAtZero:true,title:{display:true,text:"기온 / 강수",font:{size:14}},ticks:{font:{size:13}},grid:{drawOnChartArea:false}}
+        }
+      }
+    });
+    chart.update("none");
+    const url=canvas.toDataURL("image/png",1);
+    chart.destroy();
+    return url;
+  }
+
+  async function renderReportPreview(){
+    const el=document.getElementById("reportPreview");
+    const obs=[...state.observations].sort((a,b)=>a.date.localeCompare(b.date));
+    const refs=[...state.reflections].sort((a,b)=>a.date.localeCompare(b.date));
+    if(!obs.length){el.innerHTML='<div class="empty">관찰 기록을 저장하면 A4 보고서 미리보기가 만들어집니다.</div>';return;}
+
+    const p=state.project;
+    const points=calcPoints();
+    const badges=getUnlockedBadges();
+    const weatherObs=obs.filter(x=>x.weather?.mean!=null);
+    const avgMean=weatherObs.length?weatherObs.reduce((s,x)=>s+Number(x.weather.mean),0)/weatherObs.length:null;
+    const maxTemps=weatherObs.map(x=>Number(x.weather.max)).filter(Number.isFinite);
+    const minTemps=weatherObs.map(x=>Number(x.weather.min)).filter(Number.isFinite);
+    const maxTemp=maxTemps.length?Math.max(...maxTemps):null;
+    const minTemp=minTemps.length?Math.min(...minTemps):null;
+    const totalRain=weatherObs.reduce((s,x)=>s+(Number(x.weather.rain)||0),0);
+    const avgSun=weatherObs.length?weatherObs.reduce((s,x)=>s+(Number(x.weather.sun)||0),0)/weatherObs.length:null;
+    const chartUrl=await makeReportChartDataUrl(obs);
+
+    const photoUrls={};
+    for(const o of obs){
+      if(o.photoId){
+        const url=await blobURL(o.photoId);
+        if(url) photoUrls[o.id]=url;
+      }
+    }
+    const withPhotos=obs.filter(o=>photoUrls[o.id]);
+    const firstPhoto=withPhotos[0]||null;
+    const lastPhoto=withPhotos[withPhotos.length-1]||null;
+
+    const validHeights=obs.filter(o=>num(o.heightCm)!=null);
+    const firstHeight=validHeights[0] ? num(validHeights[0].heightCm) : null;
+    const lastHeight=validHeights[validHeights.length-1] ? num(validHeights[validHeights.length-1].heightCm) : null;
+    const heightChange=firstHeight!=null && lastHeight!=null ? lastHeight-firstHeight : null;
+
+    const pages=[];
+    pages.push(`
+      <div class="report-head">
+        <div>
+          <div class="report-kicker">GARDEN × CLIMATE RESEARCH</div>
+          <h1>${esc(p.cropName||"나의 작물")} 기후·성장 탐구보고서</h1>
+          <div class="report-note" style="margin-top:5px">실제 기상 데이터와 작물 관찰 기록을 연결한 한 학기 탐구 결과</div>
+        </div>
+        <div class="report-head-meta">
+          ${esc(p.studentName||"이름/별칭 없음")}<br>
+          ${esc(p.studentClass||"")}<br>
+          ${esc(p.gardenPlace||"")}
+        </div>
+      </div>
+
+      <div class="report-grid-2">
+        <div class="report-info-box">
+          <h3>1. 프로젝트 정보</h3>
+          <div class="report-info-row"><b>작물</b><span>${esc(p.cropName||"-")} ${p.variety?`(${esc(p.variety)})`:""}</span></div>
+          <div class="report-info-row"><b>재배 시작</b><span>${esc(p.plantDate||"-")} · ${dayDiff(p.plantDate)}일째</span></div>
+          <div class="report-info-row"><b>관찰 횟수</b><span>${obs.length}회 · 사진 ${withPhotos.length}장 · 성찰 ${refs.length}회</span></div>
+          <div class="report-info-row"><b>성장 변화</b><span>${heightChange==null?"측정값 부족":`${fmt(firstHeight)}cm → ${fmt(lastHeight)}cm (${heightChange>=0?"+":""}${fmt(heightChange)}cm)`}</span></div>
+        </div>
+        <div class="report-info-box">
+          <h3>작물 성장조건 조사</h3>
+          <div class="report-info-row"><b>적정기온</b><span>${p.tempMin!==""&&p.tempMax!==""?`${esc(p.tempMin)}~${esc(p.tempMax)}℃`:"-"}</span></div>
+          <div class="report-info-row"><b>일조</b><span>${p.sunHours!==""?`${esc(p.sunHours)}시간/일 이상`:"-"}</span></div>
+          <div class="report-info-row"><b>물·강수</b><span>${p.rainWeekly!==""?`${esc(p.rainWeekly)}mm/주`:"-"}</span></div>
+          <div style="font-size:12px;margin-top:4px;color:#596273">${esc(p.cropNotes||"별도 조사 메모 없음")}</div>
+        </div>
+      </div>
+
+      <div class="report-section">
+        <h2>2. 관찰일 기상 데이터 요약</h2>
+        <div class="report-weather">
+          <div class="report-stat"><span>평균기온</span><strong>${avgMean==null?"-":fmt(avgMean)+"℃"}</strong></div>
+          <div class="report-stat"><span>최고기온</span><strong>${maxTemp==null?"-":fmt(maxTemp)+"℃"}</strong></div>
+          <div class="report-stat"><span>최저기온</span><strong>${minTemp==null?"-":fmt(minTemp)+"℃"}</strong></div>
+          <div class="report-stat"><span>강수 합계</span><strong>${fmt(totalRain)}mm</strong></div>
+          <div class="report-stat"><span>평균 일조</span><strong>${avgSun==null?"-":fmt(avgSun)+"h"}</strong></div>
+        </div>
+        <div class="report-note" style="margin-top:4px">※ 앱에 저장된 관찰일의 기상자료를 기준으로 계산한 값입니다.</div>
+      </div>
+
+      <div class="report-section">
+        <h2>3. 성장과 날씨의 변화</h2>
+        ${chartUrl?`<img class="report-chart" src="${chartUrl}" alt="성장과 기상 데이터 그래프">`:`<div class="report-info-box">그래프를 만들 수 있는 측정 데이터가 아직 충분하지 않습니다.</div>`}
+      </div>
+
+      <div class="report-section">
+        <h2>4. 첫 기록과 최근 기록 비교</h2>
+        <div class="report-photo-compare">
+          <div class="report-photo-card">
+            ${firstPhoto?`<div class="report-photo-frame"><img src="${photoUrls[firstPhoto.id]}" alt="첫 관찰 사진"></div><div class="report-photo-meta"><b>${esc(firstPhoto.date)}</b> · 키 ${num(firstPhoto.heightCm)!=null?fmt(firstPhoto.heightCm)+"cm":"-"}<br>${esc(firstPhoto.note||firstPhoto.changeKeyword||"첫 관찰")}</div>`:`<div class="report-photo-empty">첫 사진 없음</div>`}
+          </div>
+          <div class="report-photo-card">
+            ${lastPhoto?`<div class="report-photo-frame"><img src="${photoUrls[lastPhoto.id]}" alt="최근 관찰 사진"></div><div class="report-photo-meta"><b>${esc(lastPhoto.date)}</b> · 키 ${num(lastPhoto.heightCm)!=null?fmt(lastPhoto.heightCm)+"cm":"-"}<br>${esc(lastPhoto.note||lastPhoto.changeKeyword||"최근 관찰")}</div>`:`<div class="report-photo-empty">최근 사진 없음</div>`}
+          </div>
+        </div>
+      </div>
+    `);
+
+    for(const group of chunkArray(obs,7)){
+      const rows=group.map(o=>{
+        const w=o.weather||{};
+        const growth=[
+          num(o.heightCm)!=null?`키 ${fmt(o.heightCm)}cm`:"",
+          num(o.leafCount)!=null?`잎 ${fmt(o.leafCount,0)}`:"",
+          num(o.flowerCount)!=null?`꽃 ${fmt(o.flowerCount,0)}`:"",
+          num(o.fruitCount)!=null?`열매 ${fmt(o.fruitCount,0)}`:""
+        ].filter(Boolean).join(" · ")||"-";
+        const weather=w.mean!=null?`${fmt(w.mean)}℃ / ${fmt(w.rain)}mm / ${fmt(w.sun)}h`:"-";
+        return `<tr>
+          <td class="num">${photoUrls[o.id]?`<img class="report-thumb" src="${photoUrls[o.id]}" alt="${esc(o.date)} 사진">`:`<div class="report-thumb-empty">사진 없음</div>`}</td>
+          <td class="num"><b>${esc(o.date.slice(5))}</b></td>
+          <td>${esc(growth)}</td>
+          <td>${esc(weather)}</td>
+          <td>${esc(o.note||o.changeKeyword||"-")}${o.weatherThought?`<div style="margin-top:3px;color:#687180">↳ ${esc(o.weatherThought)}</div>`:""}</td>
+        </tr>`;
+      }).join("");
+      pages.push(`
+        <div class="report-head">
+          <div><div class="report-kicker">OBSERVATION LOG</div><h1>날짜별 관찰 기록</h1></div>
+          <div class="report-head-meta">${esc(p.cropName||"")} · ${esc(p.studentName||"")}</div>
+        </div>
+        <div class="report-section">
+          <table class="report-table">
+            <colgroup><col style="width:65px"><col style="width:62px"><col style="width:135px"><col style="width:145px"><col></colgroup>
+            <thead><tr><th>사진</th><th>날짜</th><th>성장 측정</th><th>기온/강수/일조</th><th>관찰·날씨와의 관계</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="report-note" style="margin-top:7px">기온은 평균기온, 일조는 시간(h) 기준입니다. 기록이 없는 항목은 ‘-’로 표시됩니다.</div>
+        </div>
+      `);
+    }
+
+    if(refs.length){
+      for(const group of chunkArray(refs,2)){
+        pages.push(`
+          <div class="report-head">
+            <div><div class="report-kicker">REFLECTION</div><h1>관찰에서 생각으로</h1></div>
+            <div class="report-head-meta">관찰 → 증거 → 추론 → 다음 질문</div>
+          </div>
+          ${group.map(r=>`<div class="report-reflection">
+            <div class="date">${esc(r.date)}</div>
+            <div class="report-reflection-grid">
+              <b>관찰</b><span>${esc(r.observe||"-")}</span>
+              <b>증거</b><span>${esc(r.evidence||"-")}</span>
+              <b>추론</b><span>${esc(r.infer||"-")}</span>
+              <b>다른 가능성</b><span>${esc(r.other||"-")}</span>
+              <b>다음 관찰</b><span>${esc(r.next||"-")}</span>
+              <b>기후변화</b><span>${esc(r.climate||"-")}</span>
+            </div>
+          </div>`).join("")}
+        `);
+      }
+    }
+
+    pages.push(`
+      <div class="report-head">
+        <div><div class="report-kicker">FINAL SUMMARY</div><h1>나의 한 학기 탐구 정리</h1></div>
+        <div class="report-head-meta">${esc(p.cropName||"")} 탐구 결과</div>
+      </div>
+      <div class="report-grid-2">
+        <div class="report-info-box">
+          <h3>탐구 활동</h3>
+          <div class="report-info-row"><b>관찰</b><span>${obs.length}회</span></div>
+          <div class="report-info-row"><b>사진</b><span>${withPhotos.length}장</span></div>
+          <div class="report-info-row"><b>성찰</b><span>${refs.length}회</span></div>
+          <div class="report-info-row"><b>새싹 포인트</b><span>${points}P</span></div>
+        </div>
+        <div class="report-info-box">
+          <h3>획득한 탐구 배지</h3>
+          <div class="report-badges">${badges.length?badges.map(b=>`<span class="report-badge">${b.emoji} ${esc(b.name)}</span>`).join(""):"아직 획득한 배지가 없습니다."}</div>
+        </div>
+      </div>
+      <div class="report-section">
+        <h2>기후변화 관점에서의 최종 생각</h2>
+        <div class="report-info-box" style="min-height:120px">${esc(refs.filter(r=>r.climate?.trim()).slice(-1)[0]?.climate || "기후변화 관련 성찰을 작성하면 이곳에 표시됩니다.")}</div>
+      </div>
+      <div class="report-section">
+        <h2>내가 발견한 핵심 변화</h2>
+        <ul class="report-compact-list">
+          <li>${heightChange==null?"작물의 키 변화 데이터를 더 측정해 보자.":`작물의 키는 첫 측정 ${fmt(firstHeight)}cm에서 최근 ${fmt(lastHeight)}cm로 ${heightChange>=0?"증가":"변화"}했다.`}</li>
+          <li>관찰일 평균기온은 ${avgMean==null?"데이터 부족":fmt(avgMean)+"℃"}, 기록된 강수량 합계는 ${fmt(totalRain)}mm였다.</li>
+          <li>날씨와 작물 변화가 함께 나타나더라도 다른 요인을 함께 살펴보아야 인과관계를 더 신중하게 판단할 수 있다.</li>
+        </ul>
+      </div>
+      <div class="report-section">
+        <h2>작물 성장조건 조사 메모</h2>
+        <div class="report-info-box">${esc(p.cropNotes||"별도 조사 메모 없음")}</div>
+      </div>
+      <div class="report-section">
+        <h2>보고서를 읽는 방법</h2>
+        <div class="report-note">이 보고서는 학생이 기기에 직접 저장한 관찰·사진·성찰과 날씨 데이터를 자동 정리한 학습 결과물입니다. 수치와 기록의 의미는 학생의 실제 관찰과 수업 중 설명을 함께 바탕으로 해석합니다.</div>
+      </div>
+    `);
+
+    const total=pages.length;
+    el.innerHTML=pages.map((content,i)=>`<article class="report-page" data-report-page="${i+1}">${content}<div class="report-foot"><span>텃밭 기후·성장 탐구보고서</span><span class="report-page-number">${i+1} / ${total}</span></div></article>`).join("");
+  }
+
+  function renderBackupInfo(){
+    const ts=localStorage.getItem(LAST_BACKUP_KEY);
+    document.getElementById("backupInfo").textContent=ts?`마지막 ZIP 백업: ${new Date(ts).toLocaleString("ko-KR")}`:"아직 ZIP 백업 기록이 없습니다.";
+  }
+
+  function renderAll(){
+    renderHome();
+    renderObservations();
+    renderReflections();
+    renderGrowth();
+    renderReportPreview();
+    renderBackupInfo();
+  }
+
+  function fillSetup(){
+    const p=state.project;
+    const ack=document.getElementById("privacyAck"); if(ack && p.cropName) ack.checked=true;
+    ["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.value=p[id] ?? "";
+    });
+    const place=document.getElementById("gardenPlace");
+    if(place) place.dataset.resolvedName=(p.locationConfirmed && p.gardenPlace)?p.gardenPlace:"";
+    const status=document.getElementById("placeSearchStatus");
+    if(status){
+      if(p.locationConfirmed && num(p.latitude)!=null && num(p.longitude)!=null){
+        status.textContent=`✅ 날씨 조회 위치가 설정되었습니다. (${fmt(p.latitude,4)}, ${fmt(p.longitude,4)})`; status.className="location-search-status ok";
+      }else{
+        status.textContent="지역명을 입력한 뒤 ‘지역 찾기’를 누르면 날씨 조회용 좌표가 자동 입력됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다."; status.className="location-search-status";
+      }
+    }
+  }
+
+  function showSetup(force=false){
+    fillSetup();
+    document.getElementById("setupModal").classList.add("show");
+    document.getElementById("closeSetupBtn").classList.toggle("hide",force);
+  }
+  function hideSetup(){
+    document.getElementById("setupModal").classList.remove("show");
+  }
+
+  function resetObservationForm(){
+    document.getElementById("observationForm").reset();
+    document.getElementById("obsId").value="";
+    document.getElementById("obsDate").value=todayStr();
+    document.getElementById("photoPreview").classList.add("hide");
+    document.getElementById("photoPlaceholder").classList.remove("hide");
+    document.getElementById("photoTools").classList.add("hide");
+    document.getElementById("cameraInput").value="";
+    document.getElementById("galleryInput").value="";
+    const photoState=document.getElementById("photoSaveState"); photoState.className="photo-save-state"; photoState.textContent="";
+    selectedPhotoBlob=null;
+    removePhotoOnSave=false;
+    currentWeatherForObservation=null;
+    renderWeatherTo("ow",null);
+    document.getElementById("cancelEditBtn").classList.add("hide");
+    document.getElementById("obsStatus").className="status";
+  }
+
+  async function editObservation(id){
+    const o=state.observations.find(x=>x.id===id); if(!o) return;
+    removePhotoOnSave=false;
+    showPage("observe");
+    document.getElementById("obsId").value=o.id;
+    document.getElementById("obsDate").value=o.date;
+    document.getElementById("heightCm").value=o.heightCm??"";
+    document.getElementById("leafCount").value=o.leafCount??"";
+    document.getElementById("flowerCount").value=o.flowerCount??"";
+    document.getElementById("fruitCount").value=o.fruitCount??"";
+    document.getElementById("soilState").value=o.soilState??"";
+    document.getElementById("watered").value=o.watered??"";
+    document.getElementById("pest").value=o.pest??"";
+    document.getElementById("changeKeyword").value=o.changeKeyword??"";
+    document.getElementById("obsNote").value=o.note??"";
+    document.getElementById("weatherThought").value=o.weatherThought??"";
+    currentWeatherForObservation=o.weather||null;
+    renderWeatherTo("ow",currentWeatherForObservation);
+    if(o.photoId){
+      const url=await blobURL(o.photoId);
+      if(url){
+        document.getElementById("photoPreview").src=url;
+        document.getElementById("photoPreview").classList.remove("hide");
+        document.getElementById("photoPlaceholder").classList.add("hide");
+        document.getElementById("photoTools").classList.remove("hide");
+        const ps=document.getElementById("photoSaveState"); ps.textContent="✅ 저장된 사진을 불러왔습니다."; ps.className="photo-save-state show ok";
+      }
+    }
+    document.getElementById("cancelEditBtn").classList.remove("hide");
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  async function saveObservation(e){
+    e.preventDefault();
+    try{
+      const editId=document.getElementById("obsId").value;
+      const old=editId?state.observations.find(x=>x.id===editId):null;
+      const id=editId||uid("obs");
+      let photoId=old?.photoId||"";
+
+      if(removePhotoOnSave && old?.photoId && !selectedPhotoBlob){
+        await photoDelete(old.photoId);
+        photoId="";
+      }
+
+      if(selectedPhotoBlob){
+        photoId=photoId||uid("photo");
+        await photoPut(photoId,selectedPhotoBlob);
+        const ok=await verifyPhotoSaved(photoId);
+        if(!ok) throw new Error("사진이 기기에 저장되었는지 확인하지 못했습니다.");
+        await requestPersistentStorage();
+      }
+
+      const obs={
+        id,
+        date:document.getElementById("obsDate").value,
+        heightCm:document.getElementById("heightCm").value,
+        leafCount:document.getElementById("leafCount").value,
+        flowerCount:document.getElementById("flowerCount").value,
+        fruitCount:document.getElementById("fruitCount").value,
+        soilState:document.getElementById("soilState").value,
+        watered:document.getElementById("watered").value,
+        pest:document.getElementById("pest").value.trim(),
+        changeKeyword:document.getElementById("changeKeyword").value.trim(),
+        note:document.getElementById("obsNote").value.trim(),
+        weatherThought:document.getElementById("weatherThought").value.trim(),
+        weather:currentWeatherForObservation,
+        photoId,
+        createdAt:old?.createdAt||new Date().toISOString(),
+        updatedAt:new Date().toISOString()
+      };
+      if(editId) state.observations=state.observations.map(x=>x.id===editId?obs:x);
+      else state.observations.push(obs);
+      saveState();
+      resetObservationForm();
+      setStatus("obsStatus", editId?"관찰 기록을 수정했습니다.":"관찰 기록을 저장했습니다. 사진도 기기 저장소에서 확인했습니다.","ok");
+      toast(editId?"수정 완료":"🌱 관찰 + 사진 저장 완료");
+    }catch(err){
+      console.error(err);
+      setStatus("obsStatus",`저장하지 못했습니다: ${err.message || "알 수 없는 오류"}`,"error");
+      alert("관찰 기록을 저장하는 중 문제가 생겼습니다.\n\n"+(err.message||""));
+    }
+  }
+
+  async function deleteObservation(id){
+    const o=state.observations.find(x=>x.id===id); if(!o) return;
+    if(!confirm(`${o.date} 관찰 기록을 삭제할까요? 사진도 함께 삭제됩니다.`)) return;
+    if(o.photoId) await photoDelete(o.photoId);
+    state.observations=state.observations.filter(x=>x.id!==id);
+    saveState();
+    toast("관찰 기록을 삭제했습니다.");
+  }
+
+  function saveReflection(e){
+    e.preventDefault();
+    const r={
+      id:uid("ref"),
+      date:document.getElementById("reflectDate").value,
+      observe:document.getElementById("rObserve").value.trim(),
+      evidence:document.getElementById("rEvidence").value.trim(),
+      infer:document.getElementById("rInfer").value.trim(),
+      other:document.getElementById("rOther").value.trim(),
+      next:document.getElementById("rNext").value.trim(),
+      climate:document.getElementById("rClimate").value.trim(),
+      createdAt:new Date().toISOString()
+    };
+    if(!r.observe && !r.evidence && !r.infer && !r.next && !r.climate){
+      toast("성찰 내용을 한 가지 이상 작성해 주세요."); return;
+    }
+    state.reflections.push(r);
+    saveState();
+    document.getElementById("reflectionForm").reset();
+    document.getElementById("reflectDate").value=todayStr();
+    toast("🧠 성찰 저장 +20P");
+  }
+
+  function deleteReflection(id){
+    if(!confirm("이 성찰 기록을 삭제할까요?")) return;
+    state.reflections=state.reflections.filter(x=>x.id!==id);
+    saveState();
+    toast("성찰 기록을 삭제했습니다.");
+  }
+
+  async function backupZip(){
+    const zip=new JSZip();
+    const payload={
+      app:"garden-climate-journal",
+      version:APP_VERSION,
+      exportedAt:new Date().toISOString(),
+      state
+    };
+    zip.file("data.json",JSON.stringify(payload,null,2));
+    const folder=zip.folder("photos");
+    const photos=await allPhotos();
+    for(const p of photos){
+      folder.file(`${p.id}.jpg`,p.blob);
+    }
+    zip.file("README.txt",
+`텃밭 기후 탐구노트 백업파일
+생성일: ${new Date().toLocaleString("ko-KR")}
+앱 버전: ${APP_VERSION}
+
+이 ZIP 파일을 풀지 않고 앱의 [ZIP 복원] 메뉴에서 그대로 선택하면 기록과 사진을 복원할 수 있습니다.
+`);
+    const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
+    downloadBlob(blob,`garden-backup-${todayStr()}.zip`);
+    localStorage.setItem(LAST_BACKUP_KEY,new Date().toISOString());
+    renderBackupInfo();
+    toast("ZIP 백업파일을 저장했습니다.");
+  }
+
+  async function restoreZip(file){
+    if(!file) return;
+    if(!confirm("현재 이 기기에 있는 텃밭 데이터를 지우고 ZIP 백업 내용으로 완전히 복원할까요?")) return;
+    try{
+      const zip=await JSZip.loadAsync(file);
+      const dataFile=zip.file("data.json");
+      if(!dataFile) throw new Error("data.json이 없는 백업파일입니다.");
+      const payload=JSON.parse(await dataFile.async("string"));
+      if(payload.app!=="garden-climate-journal" || !payload.state) throw new Error("이 앱에서 만든 백업파일이 아닙니다.");
+      await photoClear();
+      const photoFolder=zip.folder("photos");
+      const entries=[];
+      zip.forEach((relativePath,entry)=>{
+        if(!entry.dir && relativePath.startsWith("photos/") && /\.(jpg|jpeg|png|webp)$/i.test(relativePath)) entries.push(entry);
+      });
+      for(const entry of entries){
+        const blob=await entry.async("blob");
+        const id=entry.name.split("/").pop().replace(/\.(jpg|jpeg|png|webp)$/i,"");
+        await photoPut(id,blob);
+      }
+      state=Object.assign(defaultState(),payload.state,{project:Object.assign(defaultState().project,payload.state.project||{})});
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+      renderAll();
+      fillSetup();
+      toast(`복원 완료: 사진 ${entries.length}장`);
+    }catch(err){
+      console.error(err);
+      alert("복원에 실패했습니다.\n"+err.message);
+    }finally{
+      document.getElementById("restoreZipInput").value="";
+    }
+  }
+
+  function downloadBlob(blob,filename){
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  }
+
+  async function waitForReportImages(root){
+    const images=[...root.querySelectorAll("img")];
+    await Promise.all(images.map(img=>{
+      if(img.complete) return Promise.resolve();
+      return new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;});
+    }));
+  }
+
+  async function generatePDF(){
+    if(!state.observations.length){toast("먼저 관찰 기록을 저장해 주세요.");return;}
+    const btn=document.getElementById("generatePdfBtn");
+    const old=btn.textContent; btn.disabled=true; btn.textContent="A4 PDF 만드는 중…";
+    try{
+      state.reportGenerated=true;
+      saveState();
+      await renderReportPreview();
+      const preview=document.getElementById("reportPreview");
+      await waitForReportImages(preview);
+      await new Promise(r=>setTimeout(r,180));
+      const pages=[...preview.querySelectorAll(".report-page")];
+      if(!pages.length) throw new Error("보고서 페이지를 만들지 못했습니다.");
+
+      const {jsPDF}=window.jspdf;
+      const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+      for(let i=0;i<pages.length;i++){
+        if(i>0) pdf.addPage("a4","portrait");
+        const canvas=await html2canvas(pages[i],{
+          scale:1.55,
+          useCORS:true,
+          backgroundColor:"#ffffff",
+          logging:false,
+          width:794,
+          height:1123,
+          windowWidth:1100
+        });
+        const imgData=canvas.toDataURL("image/jpeg",0.90);
+        pdf.addImage(imgData,"JPEG",0,0,210,297,undefined,"FAST");
+      }
+      const safeName=(state.project.studentName||"학생").replace(/[\\/:*?"<>|]/g,"_");
+      pdf.save(`텃밭탐구보고서_${safeName}_${todayStr()}.pdf`);
+      toast(`🏆 A4 보고서 ${pages.length}쪽을 저장했습니다.`);
+    }catch(err){
+      console.error(err);
+      alert("PDF 생성 중 오류가 발생했습니다.\n"+err.message);
+    }finally{
+      btn.disabled=false; btn.textContent=old;
+    }
+  }
+
+  async function printReport(){
+    if(!state.observations.length){toast("먼저 관찰 기록을 저장해 주세요.");return;}
+    await renderReportPreview();
+    const preview=document.getElementById("reportPreview");
+    await waitForReportImages(preview);
+    setTimeout(()=>window.print(),120);
+  }
+
+  async function deleteAll(){
+    const text="삭제";
+    const answer=prompt(`모든 텃밭 데이터와 사진을 이 기기에서 완전히 삭제합니다.\n되돌릴 수 없습니다.\n계속하려면 "${text}"라고 입력하세요.`);
+    if(answer!==text) return;
+    await photoClear();
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LAST_BACKUP_KEY);
+    state=defaultState();
+    saveState();
+    resetObservationForm();
+    showSetup(true);
+    toast("기기 내 데이터를 모두 삭제했습니다.");
+  }
+
+  document.querySelectorAll(".nav-btn").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.page)));
+  document.getElementById("settingsBtn").addEventListener("click",()=>showSetup(false));
+  document.getElementById("closeSetupBtn").addEventListener("click",hideSetup);
+  const showPrivacy=()=>document.getElementById("privacyModal").classList.add("show");
+  const hidePrivacy=()=>document.getElementById("privacyModal").classList.remove("show");
+  document.getElementById("privacyBtn").addEventListener("click",showPrivacy);
+  document.getElementById("privacyDetailBtn").addEventListener("click",showPrivacy);
+  document.getElementById("footerPrivacyBtn").addEventListener("click",showPrivacy);
+  document.getElementById("closePrivacyBtn").addEventListener("click",hidePrivacy);
+  document.getElementById("privacyConfirmBtn").addEventListener("click",hidePrivacy);
+  document.getElementById("searchPlaceBtn").addEventListener("click",searchGardenPlace);
+  document.getElementById("gardenPlace").addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();searchGardenPlace();} });
+  document.getElementById("gardenPlace").addEventListener("input",e=>{
+    if(e.target.value!==e.target.dataset.resolvedName){
+      document.getElementById("latitude").value=""; document.getElementById("longitude").value="";
+      const status=document.getElementById("placeSearchStatus");
+      status.textContent="지역명이 바뀌었습니다. ‘지역 찾기’를 눌러 날씨 조회 위치를 다시 설정해 주세요."; status.className="location-search-status";
+    }
+  });
+
+  document.getElementById("setupForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const lat=num(document.getElementById("latitude").value), lon=num(document.getElementById("longitude").value);
+    if(lat===null || lon===null){
+      const status=document.getElementById("placeSearchStatus");
+      status.textContent="❌ ‘지역 찾기’를 눌러 텃밭 지역을 먼저 확인해 주세요."; status.className="location-search-status error";
+      document.getElementById("gardenPlace").focus(); return;
+    }
+    const ids=["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"];
+    ids.forEach(id=>state.project[id]=document.getElementById(id).value);
+    state.project.latitude=lat;
+    state.project.longitude=lon;
+    state.project.locationConfirmed=true;
+    saveState(); hideSetup(); toast("프로젝트 설정을 저장했습니다.");
+    requestPersistentStorage();
+    loadTodayWeather();
+  });
+
+  async function handlePhotoSelection(file, sourceLabel){
+    if(!file) return;
+    const stateEl=document.getElementById("photoSaveState");
+    stateEl.textContent=`${sourceLabel} 사진을 처리하는 중…`; stateEl.className="photo-save-state show";
+    try{
+      selectedPhotoBlob=await compressImage(file);
+      removePhotoOnSave=false;
+      const url=URL.createObjectURL(selectedPhotoBlob);
+      const img=document.getElementById("photoPreview");
+      img.onload=()=>setTimeout(()=>URL.revokeObjectURL(url),1000);
+      img.src=url; img.classList.remove("hide");
+      document.getElementById("photoPlaceholder").classList.add("hide");
+      document.getElementById("photoTools").classList.remove("hide");
+      stateEl.textContent=`✅ 사진 준비 완료 · ${(selectedPhotoBlob.size/1024).toFixed(0)}KB · 기록 저장 버튼을 누르면 기기에 저장됩니다.`;
+      stateEl.className="photo-save-state show ok";
+      toast("📸 사진 준비 완료");
+    }catch(err){
+      console.error(err); selectedPhotoBlob=null;
+      stateEl.textContent=`❌ ${err.message || "사진을 처리하지 못했습니다."}`; stateEl.className="photo-save-state show error";
+      alert("사진을 처리하지 못했습니다. 다른 사진을 선택하거나 기본 카메라 앱에서 촬영 후 앨범에서 선택해 주세요.\n\n"+(err.message||""));
+    }
+  }
+
+  document.getElementById("cameraInput").addEventListener("change",e=>handlePhotoSelection(e.target.files?.[0],"카메라"));
+  document.getElementById("galleryInput").addEventListener("change",e=>handlePhotoSelection(e.target.files?.[0],"앨범"));
+  document.getElementById("removeSelectedPhoto").addEventListener("click",()=>{
+    selectedPhotoBlob=null;
+    removePhotoOnSave=!!document.getElementById("obsId").value;
+    document.getElementById("photoPreview").src="";
+    document.getElementById("photoPreview").classList.add("hide");
+    document.getElementById("photoPlaceholder").classList.remove("hide");
+    document.getElementById("photoTools").classList.add("hide");
+    document.getElementById("cameraInput").value=""; document.getElementById("galleryInput").value="";
+    const stateEl=document.getElementById("photoSaveState"); stateEl.className="photo-save-state"; stateEl.textContent="";
+  });
+
+  document.getElementById("fetchObsWeather").addEventListener("click",async()=>{
+    const date=document.getElementById("obsDate").value;
+    if(!date){setStatus("obsStatus","관찰 날짜를 먼저 선택해 주세요.","warn");return;}
+    try{
+      setStatus("obsStatus","기상 데이터를 불러오는 중입니다.","warn");
+      currentWeatherForObservation=await fetchWeather(date);
+      renderWeatherTo("ow",currentWeatherForObservation);
+      setStatus("obsStatus",`${date} 날씨를 자동 입력했습니다. (Open‑Meteo)`,"ok");
+    }catch(err){setStatus("obsStatus",err.message,"error");}
+  });
+
+  async function loadTodayWeather(){
+    try{
+      document.getElementById("todayWeatherStatus").textContent="오늘 날씨를 불러오는 중…";
+      const w=await fetchWeather(todayStr());
+      renderWeatherTo("w",w);
+      document.getElementById("todayWeatherStatus").textContent=`${state.project.gardenPlace||"설정 위치"} · ${todayStr()} · Open‑Meteo`;
+    }catch(err){
+      document.getElementById("todayWeatherStatus").textContent=err.message;
+      renderWeatherTo("w",null);
+    }
+  }
+  document.getElementById("refreshTodayWeather").addEventListener("click",loadTodayWeather);
+  document.getElementById("observationForm").addEventListener("submit",saveObservation);
+  document.getElementById("cancelEditBtn").addEventListener("click",resetObservationForm);
+
+  document.getElementById("observationTimeline").addEventListener("click",e=>{
+    const edit=e.target.closest(".edit-observation"), del=e.target.closest(".delete-observation");
+    if(edit) editObservation(edit.dataset.id);
+    if(del) deleteObservation(del.dataset.id);
+  });
+
+  document.getElementById("reflectionForm").addEventListener("submit",saveReflection);
+  document.getElementById("reflectionList").addEventListener("click",e=>{
+    const del=e.target.closest(".delete-reflection"); if(del) deleteReflection(del.dataset.id);
+  });
+  document.getElementById("backupZipBtn").addEventListener("click",backupZip);
+  document.getElementById("restoreZipInput").addEventListener("change",e=>restoreZip(e.target.files?.[0]));
+  document.getElementById("generatePdfBtn").addEventListener("click",generatePDF);
+  document.getElementById("printReportBtn").addEventListener("click",printReport);
+  document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
+
+  document.getElementById("obsDate").value=todayStr();
+  document.getElementById("reflectDate").value=todayStr();
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+  }
+
+  renderAll();
+  if(!state.project.cropName || !state.project.plantDate) showSetup(true);
+  else loadTodayWeather();
+
+})();
+</script>
+</body>
+</html>

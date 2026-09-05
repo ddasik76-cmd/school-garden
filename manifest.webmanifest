@@ -1,0 +1,10 @@
+{
+  "name": "텃밭 기후 탐구노트",
+  "short_name": "텃밭탐구",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f7fb",
+  "theme_color": "#6957d9",
+  "lang": "ko",
+  "description": "기상 데이터와 작물 성장을 연결해 기록하는 학생용 탐구 웹앱"
+}
