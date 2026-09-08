@@ -1,0 +1,1 @@
+The restored ASOS app is the baseline for a city/county/district search. Changes must keep browser storage intact, automatically associate a nearby observation source, provide an explicit save button, and pass startup tests before release.
