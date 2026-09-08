@@ -1,0 +1,1 @@
+The city/county/district search must select its weather observation source automatically. Add a separate region save button, preserve existing local data, and validate startup before publishing.
