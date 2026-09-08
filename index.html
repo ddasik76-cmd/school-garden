@@ -7,6 +7,7 @@
   <meta name="description" content="기상 데이터와 작물 성장 기록을 연결하는 학생용 텃밭 탐구 웹앱" />
   <title>텃밭 기후 탐구노트</title>
   <link rel="manifest" href="/school-garden/manifest.webmanifest?v=19" />
+  <link rel="stylesheet" href="./mobile-fixes.css?v=22" />
   <link rel="icon" href="/school-garden/favicon.ico?v=19" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/school-garden/favicon-32x32.png?v=19" />
   <link rel="icon" type="image/png" sizes="192x192" href="/school-garden/android-chrome-192x192.png?v=19" />
@@ -662,6 +663,7 @@
             <button class="btn secondary" type="button" id="searchPlaceBtn">🔎 지역 찾기</button>
           </div>
           <div id="placeSearchStatus" class="location-search-status">지역명을 입력한 뒤 ‘지역 찾기’를 누르면 날씨 조회용 좌표가 자동 입력됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다.</div>
+          <div id="placeSearchResults" class="location-search-results" role="group" aria-label="지역 검색 결과"></div>
           <div class="location-coords">
             <input id="latitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 위도" placeholder="위도">
             <input id="longitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 경도" placeholder="경도">
@@ -802,7 +804,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.7.0";
+  const APP_VERSION = "1.10.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const DB_NAME = "gardenClimateJournalDB";
@@ -1109,31 +1111,116 @@
     window.scrollTo({top:0,behavior:"smooth"});
   }
 
+  // 지역명은 외부 지오코딩 서비스에서 찾되, 학생 정보는 요청하지 않습니다.
+  // 한국어 행정구역 접미사와 일부 통용 영문 표기를 함께 지원합니다.
+  const PLACE_ALIASES = Object.freeze({
+    "서산":"Seosan", "서울":"Seoul", "부산":"Busan", "대구":"Daegu",
+    "인천":"Incheon", "광주":"Gwangju", "대전":"Daejeon", "울산":"Ulsan",
+    "세종":"Sejong", "제주":"Jeju", "서귀포":"Seogwipo", "수원":"Suwon",
+    "천안":"Cheonan", "아산":"Asan", "공주":"Gongju", "논산":"Nonsan",
+    "당진":"Dangjin", "태안":"Taean", "홍성":"Hongseong", "예산":"Yesan",
+    "보령":"Boryeong", "계룡":"Gyeryong", "금산":"Geumsan", "청양":"Cheongyang",
+    "부여":"Buyeo", "서천":"Seocheon"
+  });
+  let placeSearchSerial=0;
+
+  function locationSearchQueries(raw){
+    const full=String(raw||"").trim().replace(/\s+/g," ");
+    const korean=/[가-힣]/.test(full);
+    const last=full.split(/[\s,]+/).filter(Boolean).pop()||"";
+    const short=last.replace(/(?:특별자치도|특별자치시|특별시|광역시|자치도|자치시|시|군|구)$/u,"");
+    const alias=PLACE_ALIASES[short];
+    const queries=[];
+    for(const q of [alias,full,short]){
+      if(q && !queries.includes(q)) queries.push(q);
+    }
+    return {queries,korean};
+  }
+
+  function normalizeLocationResult(result){
+    const latitude=Number(result.latitude),longitude=Number(result.longitude);
+    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180) return null;
+    const parts=[result.name,result.admin2,result.admin1,result.country].filter(Boolean);
+    const label=parts.filter((part,index)=>parts.indexOf(part)===index).join(" · ");
+    return {id:String(result.id||`${latitude},${longitude}`),latitude,longitude,label,countryCode:result.country_code||""};
+  }
+
+  async function lookupGardenLocations(raw,request=fetch){
+    const {queries,korean}=locationSearchQueries(raw);
+    if(!queries.length) return [];
+    let lastError=null;
+    for(const query of queries){
+      const params=new URLSearchParams({name:query,count:"10",language:"ko",format:"json"});
+      if(korean) params.set("countryCode","KR");
+      let response;
+      try{
+        response=await request(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
+      }catch(error){
+        throw new Error("지역 검색 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
+      }
+      if(!response.ok){
+        if(response.status===429) throw new Error("검색 요청이 많습니다. 잠시 후 다시 시도해 주세요.");
+        lastError=new Error(`지역 검색 서버 오류 (${response.status})`);
+        continue;
+      }
+      const data=await response.json();
+      if(data.error){lastError=new Error(data.reason||"지역 검색 오류");continue;}
+      const results=(Array.isArray(data.results)?data.results:[])
+        .map(normalizeLocationResult).filter(Boolean)
+        .filter(r=>!korean||!r.countryCode||r.countryCode==="KR");
+      const seen=new Set();
+      const unique=results.filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true;});
+      if(unique.length) return unique;
+    }
+    if(lastError) throw lastError;
+    return [];
+  }
+
+  function applyGardenLocation(result){
+    const input=document.getElementById("gardenPlace");
+    input.value=result.label;
+    input.dataset.resolvedName=result.label;
+    document.getElementById("latitude").value=result.latitude.toFixed(4);
+    document.getElementById("longitude").value=result.longitude.toFixed(4);
+    const status=document.getElementById("placeSearchStatus");
+    status.textContent=`✅ ${result.label} · 날씨 조회 위치 설정 완료`;
+    status.className="location-search-status ok";
+    document.getElementById("placeSearchResults").replaceChildren();
+  }
+
   async function searchGardenPlace(){
     const input=document.getElementById("gardenPlace");
     const status=document.getElementById("placeSearchStatus");
-    const latEl=document.getElementById("latitude"), lonEl=document.getElementById("longitude");
+    const resultsEl=document.getElementById("placeSearchResults");
+    const button=document.getElementById("searchPlaceBtn");
     const query=input.value.trim();
+    const serial=++placeSearchSerial;
+    resultsEl.replaceChildren();
     if(query.length<2){
-      status.textContent="지역명을 2글자 이상 입력해 주세요."; status.className="location-search-status error"; return;
+      status.textContent="지역명을 2글자 이상 입력해 주세요.";status.className="location-search-status error";return;
     }
-    status.textContent="지역을 찾는 중입니다…"; status.className="location-search-status";
+    button.disabled=true;
+    status.textContent="지역을 찾는 중입니다…";status.className="location-search-status";
     try{
-      const params=new URLSearchParams({name:query,count:"5",language:"ko",format:"json"});
-      const res=await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
-      if(!res.ok) throw new Error("지역 검색 서비스에 연결하지 못했습니다.");
-      const data=await res.json();
-      const result=data.results?.[0];
-      if(!result) throw new Error("검색 결과가 없습니다. 시·군·구 또는 도시 이름을 다시 입력해 주세요.");
-      const label=[result.name,result.admin2,result.admin1].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(" ");
-      input.value=label || query;
-      input.dataset.resolvedName=input.value;
-      latEl.value=Number(result.latitude).toFixed(4);
-      lonEl.value=Number(result.longitude).toFixed(4);
-      status.textContent=`✅ ${input.value} · 날씨 조회 위치 설정 완료`; status.className="location-search-status ok";
-    }catch(err){
-      console.error(err); latEl.value=""; lonEl.value=""; input.dataset.resolvedName="";
-      status.textContent=`❌ ${err.message}`; status.className="location-search-status error";
+      const results=await lookupGardenLocations(query);
+      if(serial!==placeSearchSerial) return;
+      if(!results.length){
+        throw new Error("검색 결과가 없습니다. 예: 서산시 → 서산 → Seosan 순서로 다시 검색해 보세요.");
+      }
+      if(results.length===1){applyGardenLocation(results[0]);return;}
+      status.textContent="검색 결과가 여러 개입니다. 텃밭이 있는 지역을 선택해 주세요.";
+      results.forEach(result=>{
+        const choice=document.createElement("button");
+        choice.type="button";choice.className="location-result";
+        choice.textContent=result.label;
+        choice.addEventListener("click",()=>applyGardenLocation(result));
+        resultsEl.appendChild(choice);
+      });
+    }catch(error){
+      if(serial!==placeSearchSerial)return;
+      status.textContent=`❌ ${error.message}`;status.className="location-search-status error";
+    }finally{
+      if(serial===placeSearchSerial)button.disabled=false;
     }
   }
 
@@ -1894,6 +1981,9 @@
   document.getElementById("gardenPlace").addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();searchGardenPlace();} });
   document.getElementById("gardenPlace").addEventListener("input",e=>{
     if(e.target.value!==e.target.dataset.resolvedName){
+      placeSearchSerial++;
+      document.getElementById("placeSearchResults").replaceChildren();
+      document.getElementById("searchPlaceBtn").disabled=false;
       document.getElementById("latitude").value=""; document.getElementById("longitude").value="";
       const status=document.getElementById("placeSearchStatus");
       status.textContent="지역명이 바뀌었습니다. ‘지역 찾기’를 눌러 날씨 조회 위치를 다시 설정해 주세요."; status.className="location-search-status";
@@ -1903,7 +1993,7 @@
   document.getElementById("setupForm").addEventListener("submit",e=>{
     e.preventDefault();
     const lat=num(document.getElementById("latitude").value), lon=num(document.getElementById("longitude").value);
-    if(lat===null || lon===null){
+    if(lat===null || lon===null || document.getElementById("gardenPlace").value!==document.getElementById("gardenPlace").dataset.resolvedName){
       const status=document.getElementById("placeSearchStatus");
       status.textContent="❌ ‘지역 찾기’를 눌러 텃밭 지역을 먼저 확인해 주세요."; status.className="location-search-status error";
       document.getElementById("gardenPlace").focus(); return;
@@ -2000,7 +2090,7 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=19", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=22", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
