@@ -1,0 +1,1 @@
+Implement searchable administrative regions with an automatically associated nearby ASOS observation source and an explicit save action. Preserve existing browser records and validate startup on the restored ASOS baseline before release.
