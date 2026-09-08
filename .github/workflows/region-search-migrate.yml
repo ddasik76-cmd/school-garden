@@ -1,0 +1,43 @@
+name: Restore garden region search
+on:
+  push:
+    branches: [asos-integration]
+    paths: [.github/workflows/region-search-migrate.yml]
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply migration to verified source
+        run: python tools/restore-region-search.py
+      - name: Check JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('index.html').read_text(encoding='utf-8')
+          script=html.rsplit('<script>',1)[1].split('</script>',1)[0]
+          Path('/tmp/school-garden.js').write_text(script,encoding='utf-8')
+          PY
+          node --check /tmp/school-garden.js
+          node --check service-worker.js
+          node --check garden-location-search.js
+      - name: Run regression tests
+        run: |
+          node tests/asos-client.test.cjs
+          node tests/garden-location-search.test.cjs
+      - name: Commit tested application update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -- tools/restore-region-search.py .github/workflows/region-search-migrate.yml
+          git add index.html service-worker.js garden-location-search.js tests/garden-location-search.test.cjs
+          git commit -m "Restore offline garden region search"
+          git push origin HEAD:asos-integration
