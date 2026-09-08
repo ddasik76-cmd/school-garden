@@ -1,0 +1,1 @@
+Replace the manual station selector with city/county/district search, automatic nearby observation-source association, and an explicit region save button. Keep existing local data and verify startup before publishing.
