@@ -45,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -- tools/migrate-asos.py .github/workflows/asos-migrate.yml
+          git rm -f -- tools/migrate-asos.py .github/workflows/asos-migrate.yml
           git add index.html service-worker.js tests/asos-client.test.cjs
           git commit -m "Switch garden weather to KMA ASOS observations"
           git push origin HEAD:asos-integration
