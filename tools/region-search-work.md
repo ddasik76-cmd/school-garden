@@ -1,0 +1,1 @@
+Build the requested city/county/district search on the restored ASOS application, automatically associate a nearby observation source, and add an explicit region save button. Preserve all existing browser data and test startup before release.
