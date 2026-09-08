@@ -1,0 +1,1 @@
+Implement a searchable city/county/district field with automatic nearby ASOS station mapping and a separate save action. Preserve existing local records and photos, and test startup before updating the published app.
