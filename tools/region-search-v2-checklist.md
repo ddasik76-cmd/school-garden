@@ -1,0 +1,1 @@
+Implement searchable city/county/district selection, automatic nearby ASOS association, a dedicated region save button, and startup/persistence tests. Preserve existing observations and photos on the restored ASOS baseline.
