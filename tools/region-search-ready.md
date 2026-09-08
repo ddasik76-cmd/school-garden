@@ -1,0 +1,1 @@
+Implement a city/county/district search that automatically resolves the mapped nearby ASOS source. Provide a dedicated save button and keep all existing local observations/photos. Run startup and persistence checks before release.
