@@ -1,0 +1,1 @@
+Implement city/county/district search with automatic nearby ASOS source selection and an explicit save action. Preserve local observation and photo data. Test startup and the complete selection/save workflow before publishing.
