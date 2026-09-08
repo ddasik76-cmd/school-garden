@@ -1,0 +1,1 @@
+Use the restored ASOS application as the baseline. Add a city/county/district search and automatically select the mapped nearby observation source. Keep a separate region save action and preserve existing browser data. Verify the startup path and location persistence before release.
