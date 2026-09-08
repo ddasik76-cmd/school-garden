@@ -1,0 +1,1 @@
+Restore city/county/district lookup on the working ASOS baseline. The user chooses a geographic result, the app resolves its nearby observation source internally, and a separate save button persists the setting. Preserve browser records and test startup before publication.
