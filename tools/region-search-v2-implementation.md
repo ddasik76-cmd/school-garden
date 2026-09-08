@@ -1,0 +1,1 @@
+Implement city/county/district search, automatic nearby ASOS association, a dedicated region save button, and startup/persistence tests on the restored application. Do not modify existing observations, photographs, or browser storage keys.
