@@ -409,11 +409,11 @@
       </div>
 
       <div class="section-title">
-        <div><h2>오늘의 날씨</h2><p>설정한 텃밭 위치 기준</p></div>
+        <div><h2>최근 확정 기상자료</h2><p>선택한 ASOS 관측지점 기준 · 오늘의 실시간 날씨가 아닙니다.</p></div>
         <button class="btn small secondary" id="refreshTodayWeather">새로고침</button>
       </div>
       <div class="card">
-        <div id="todayWeatherStatus" class="subtle">날씨를 불러오려면 설정에서 위치를 확인하세요.</div>
+        <div id="todayWeatherStatus" class="subtle">날씨를 불러오려면 설정에서 ASOS 관측지점을 선택하세요.</div>
         <div class="weather-grid">
           <div class="weather-item"><span>평균기온</span><strong id="wMean">-</strong></div>
           <div class="weather-item"><span>최고기온</span><strong id="wMax">-</strong></div>
@@ -430,7 +430,7 @@
       <div id="homeRecent" class="timeline"></div>
 
       <footer class="dashboard-footer">
-        <div class="maker">만든 사람 이 제중 · 팔봉중학교</div>
+        <div class="maker">만든 사람 이제중 · 팔봉중학교</div>
         <div>문의 <a href="mailto:ddasik7@hanmail.net">ddasik7@hanmail.net</a> · Instagram <a href="https://www.instagram.com/aijinro" target="_blank" rel="noopener">@aijinro</a></div>
         <div class="footer-guide">무료 교육용 웹앱 · 학생 기록과 사진은 운영자 서버에 저장하지 않습니다.<br>기기 변경·브라우저 데이터 삭제 전 ZIP 백업을 권장합니다. · <button type="button" id="footerPrivacyBtn" style="border:0;background:none;padding:0;color:#6d58c8;font-size:inherit;text-decoration:underline">개인정보 처리방침</button></div>
       </footer>
@@ -615,7 +615,7 @@
           <ul class="privacy-list">
             <li>작물 정보·관찰·성찰은 이 브라우저의 <strong>localStorage</strong>에 저장됩니다.</li>
             <li>사진은 압축 후 이 브라우저의 <strong>IndexedDB</strong>에 저장됩니다.</li>
-            <li>날씨 조회에는 설정한 텃밭의 위도·경도와 조회 날짜가 외부 날씨 서비스로 전송됩니다. 호스팅·CDN 사업자는 일반적인 접속정보를 처리할 수 있습니다.</li>
+            <li>날씨 조회에는 선택한 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관합니다. 호스팅·CDN 사업자는 일반적인 접속정보를 처리할 수 있습니다.</li>
             <li>브라우저 데이터 삭제·기기 교체 전에 <strong>ZIP 백업</strong>을 받아야 기록을 안전하게 옮길 수 있습니다.</li>
             <li>사진에는 학생 얼굴, 이름표, 개인 연락처 등 개인을 알아볼 수 있는 정보가 나오지 않도록 합니다.</li>
           </ul>
@@ -658,16 +658,11 @@
         <div class="field"><label for="plantDate">파종/정식일 *</label><input id="plantDate" type="date" required></div>
         <div class="field full">
           <label for="gardenPlace">텃밭 지역 *</label>
-          <div class="location-search-row">
-            <input id="gardenPlace" required placeholder="예: 서울특별시, 대전광역시, 제주특별자치도 제주시">
-            <button class="btn secondary" type="button" id="searchPlaceBtn">🔎 지역 찾기</button>
-          </div>
-          <div id="placeSearchStatus" class="location-search-status">지역명을 입력한 뒤 ‘지역 찾기’를 누르면 날씨 조회용 좌표가 자동 입력됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다.</div>
-          <div id="placeSearchResults" class="location-search-results" role="group" aria-label="지역 검색 결과"></div>
-          <div class="location-coords">
-            <input id="latitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 위도" placeholder="위도">
-            <input id="longitude" type="number" step="0.0001" readonly aria-label="날씨 조회용 경도" placeholder="경도">
-          </div>
+          <input id="gardenPlace" required placeholder="예: 팔봉중학교 텃밭, 서산시 팔봉면">
+          <label for="asosStation">대표 기상 관측지점 *</label>
+          <select id="asosStation" required aria-describedby="placeSearchStatus"><option value="">관측지점 선택</option></select>
+          <div id="placeSearchStatus" class="location-search-status">텃밭과 가까운 ASOS 관측지점을 직접 선택하세요. 관측소 자료는 텃밭에서 직접 측정한 값이 아닙니다. GPS와 외부 지역검색을 사용하지 않습니다.</div>
+          <input id="latitude" type="hidden"><input id="longitude" type="hidden">
         </div>
         <div class="field"><label for="tempMin">적정 최저기온(℃)</label><input id="tempMin" type="number" step="0.1" placeholder="20"></div>
         <div class="field"><label for="tempMax">적정 최고기온(℃)</label><input id="tempMax" type="number" step="0.1" placeholder="27"></div>
@@ -679,7 +674,7 @@
         <strong>🔒 저장 전 확인</strong>
         <ul class="privacy-list">
           <li>학생의 기록과 사진은 서버가 아니라 현재 기기 브라우저에 저장됩니다.</li>
-          <li>날씨 조회 시 학생이 직접 설정한 텃밭 지역의 좌표와 날짜만 Open‑Meteo로 전송됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다.</li>
+          <li>날씨 조회 시 선택한 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관하며 GPS는 사용하지 않습니다.</li>
           <li>공용기기에서는 사용 후 반드시 PDF/ZIP 백업 뒤 데이터를 삭제하세요.</li>
         </ul>
         <label class="setup-consent">
@@ -733,13 +728,13 @@
       <section class="policy-section">
         <h3>제4조 개인정보의 제3자 제공</h3>
         <p>서비스 개발자는 이용자의 이름, 사진, 관찰 및 성찰 기록을 수집하지 않으며 제3자에게 제공하지 않습니다.</p>
-        <p>날씨 기능을 이용할 때에는 이용자가 지정한 <strong>텃밭 지역의 좌표와 조회 날짜</strong>가 Open‑Meteo에 전송됩니다. 학생 이름·사진·관찰 내용은 날씨 요청에 포함하지 않으며 개인의 현재 위치(GPS)는 사용하지 않습니다.</p>
+        <p>날씨 기능은 선택한 <strong>ASOS 관측지점 번호와 조회 날짜</strong>를 Firebase Functions로 전송하고, 서버에서 기상청 API를 호출합니다. 학생 이름·사진·관찰 내용은 날씨 요청에 포함하지 않으며 개인의 현재 위치(GPS)는 사용하지 않습니다.</p>
       </section>
 
       <section class="policy-section">
         <h3>제5조 개인정보 처리의 위탁</h3>
         <p>서비스 개발자는 별도로 수집한 학생 개인정보 처리업무를 외부 기관 또는 업체에 위탁하지 않습니다.</p>
-        <p>다만 웹앱 제공과 기능 구현을 위해 GitHub Pages, jsDelivr, Open‑Meteo와 같은 외부 서비스를 이용하며, 각 서비스가 접속 과정에서 처리하는 정보는 해당 사업자의 개인정보 처리방침 및 정책에 따릅니다.</p>
+        <p>다만 웹앱 제공과 기능 구현을 위해 GitHub Pages, jsDelivr, Firebase Functions, 기상청 API와 같은 외부 서비스를 이용하며, 각 서비스가 접속 과정에서 처리하는 정보는 해당 사업자의 개인정보 처리방침 및 정책에 따릅니다.</p>
       </section>
 
       <section class="policy-section">
@@ -767,7 +762,8 @@
         <ul>
           <li>GitHub Pages: 웹앱 파일 제공</li>
           <li>jsDelivr: Chart.js, JSZip, html2canvas, jsPDF 등 라이브러리 제공</li>
-          <li>Open‑Meteo: 지역 검색 및 날씨 데이터 조회</li>
+          <li>Firebase Functions / Google Cloud: 기상청 API 호출 및 인증키 보관</li>
+          <li>기상청: ASOS 관측지점의 일자료 제공</li>
         </ul>
         <p>이들 서비스는 접속 과정에서 IP 주소, 접속 시각, 브라우저·기기 정보 등의 기술적 정보를 각 서비스의 정책에 따라 자동 처리할 수 있습니다. 서비스 개발자는 이러한 정보를 학생의 관찰기록이나 성적정보와 결합하여 학생 개인을 식별하는 데 사용하지 않습니다.</p>
       </section>
@@ -777,7 +773,7 @@
         <p>서비스의 개인정보 보호 및 데이터 처리 구조에 관한 문의는 아래 채널을 통해 할 수 있습니다.</p>
         <div class="policy-contact">
           <div><strong>서비스명:</strong> 텃밭 기후 탐구노트</div>
-          <div><strong>개발자:</strong> 이 제중</div>
+          <div><strong>개발자:</strong> 이제중</div>
           <div><strong>소속:</strong> 팔봉중학교</div>
           <div><strong>이메일:</strong> <a href="mailto:ddasik7@hanmail.net">ddasik7@hanmail.net</a></div>
           <div><strong>Instagram:</strong> <a href="https://www.instagram.com/aijinro" target="_blank" rel="noopener">@aijinro</a></div>
@@ -787,7 +783,7 @@
       <section class="policy-section">
         <h3>제11조 개인정보 처리방침의 변경</h3>
         <p>본 개인정보 처리방침은 관련 법령, 학교 운영 기준 또는 서비스 기능의 변경에 따라 수정될 수 있으며, 중요한 변경이 있는 경우 서비스 화면 등을 통해 안내합니다.</p>
-        <div class="policy-date">시행일: 2026년 9월 5일</div>
+        <div class="policy-date">시행일: 2026년 9월 8일</div>
       </section>
     </div>
     <div class="policy-actions"><button class="policy-confirm" id="privacyConfirmBtn" type="button">확인</button></div>
@@ -804,7 +800,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.10.0";
+  const APP_VERSION = "1.11.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const DB_NAME = "gardenClimateJournalDB";
@@ -848,6 +844,7 @@
   let selectedPhotoBlob = null;
   let removePhotoOnSave = false;
   let currentWeatherForObservation = null;
+  let weatherRequestSerial = 0;
   let growthChart = null;
 
   function defaultState(){
@@ -867,6 +864,7 @@
         latitude:null,
         longitude:null,
         locationConfirmed:false,
+        stationId:"",
         cropNotes:""
       },
       observations:[],
@@ -1111,148 +1109,51 @@
     window.scrollTo({top:0,behavior:"smooth"});
   }
 
-  // 지역명은 외부 지오코딩 서비스에서 찾되, 학생 정보는 요청하지 않습니다.
-  // 한국어 행정구역 접미사와 일부 통용 영문 표기를 함께 지원합니다.
-  const PLACE_ALIASES = Object.freeze({
-    "서산":"Seosan", "서울":"Seoul", "부산":"Busan", "대구":"Daegu",
-    "인천":"Incheon", "광주":"Gwangju", "대전":"Daejeon", "울산":"Ulsan",
-    "세종":"Sejong", "제주":"Jeju", "서귀포":"Seogwipo", "수원":"Suwon",
-    "천안":"Cheonan", "아산":"Asan", "공주":"Gongju", "논산":"Nonsan",
-    "당진":"Dangjin", "태안":"Taean", "홍성":"Hongseong", "예산":"Yesan",
-    "보령":"Boryeong", "계룡":"Gyeryong", "금산":"Geumsan", "청양":"Cheongyang",
-    "부여":"Buyeo", "서천":"Seocheon"
-  });
-  let placeSearchSerial=0;
+  // 기상청 ASOS 일자료. 관측지점은 학생이 직접 선택합니다.
+  const ASOS_URL="https://asia-northeast3-school-garden-weather.cloudfunctions.net/asosDaily";
+  const ASOS_STATIONS=Object.freeze({"90":"속초","93":"북춘천","95":"철원","98":"동두천","99":"파주","100":"대관령","101":"춘천","102":"백령도","104":"북강릉","105":"강릉","106":"동해","108":"서울","112":"인천","114":"원주","115":"울릉도","119":"수원","121":"영월","127":"충주","129":"서산","130":"울진","131":"청주","133":"대전","135":"추풍령","136":"안동","137":"상주","138":"포항","140":"군산","143":"대구","146":"전주","152":"울산","155":"창원","156":"광주","159":"부산","162":"통영","165":"목포","168":"여수","169":"흑산도","170":"완도","172":"고창","174":"순천","177":"홍성","184":"제주","185":"고산","188":"성산","189":"서귀포","192":"진주","201":"강화","202":"양평","203":"이천","211":"인제","212":"홍천","216":"태백","217":"정선군","221":"제천","226":"보은","232":"천안","235":"보령","236":"부여","238":"금산","239":"세종","243":"부안","244":"임실","245":"정읍","247":"남원","248":"장수","251":"고창군","252":"영광군","253":"김해시","254":"순창군","255":"북창원","257":"양산시","258":"보성군","259":"강진군","260":"장흥","261":"해남","262":"고흥","263":"의령군","264":"함양군","266":"광양시","268":"진도군","271":"봉화","272":"영주","273":"문경","276":"청송군","277":"영덕","278":"의성","279":"구미","281":"영천","283":"경주시","284":"거창","285":"합천","288":"밀양","289":"산청","294":"거제","295":"남해"});
+  const ASOS_FIELDS=["mean","max","min","rain","sun"];
 
-  function locationSearchQueries(raw){
-    const full=String(raw||"").trim().replace(/\s+/g," ");
-    const korean=/[가-힣]/.test(full);
-    const last=full.split(/[\s,]+/).filter(Boolean).pop()||"";
-    const short=last.replace(/(?:특별자치도|특별자치시|특별시|광역시|자치도|자치시|시|군|구)$/u,"");
-    const alias=PLACE_ALIASES[short];
-    const queries=[];
-    for(const q of [alias,full,short]){
-      if(q && !queries.includes(q)) queries.push(q);
-    }
-    return {queries,korean};
+  function validAsosStation(id){return Object.prototype.hasOwnProperty.call(ASOS_STATIONS,String(id||""));}
+  function asosStationLabel(id){return validAsosStation(id)?`${ASOS_STATIONS[String(id)]} (${id})`:"관측지점 미설정";}
+  function asosDateValid(date){
+    if(typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))return false;
+    const d=new Date(date+"T00:00:00Z");
+    return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===date;
   }
-
-  function normalizeLocationResult(result){
-    const latitude=Number(result.latitude),longitude=Number(result.longitude);
-    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180) return null;
-    const parts=[result.name,result.admin2,result.admin1,result.country].filter(Boolean);
-    const label=parts.filter((part,index)=>parts.indexOf(part)===index).join(" · ");
-    return {id:String(result.id||`${latitude},${longitude}`),latitude,longitude,label,countryCode:result.country_code||""};
+  function latestAsosDate(now=new Date()){
+    const parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{
+      timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"
+    }).formatToParts(now).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+    const back=Number(parts.hour)<11?2:1;
+    return new Date(Date.UTC(Number(parts.year),Number(parts.month)-1,Number(parts.day))-back*86400000).toISOString().slice(0,10);
   }
-
-  async function lookupGardenLocations(raw,request=fetch){
-    const {queries,korean}=locationSearchQueries(raw);
-    if(!queries.length) return [];
-    let lastError=null;
-    for(const query of queries){
-      const params=new URLSearchParams({name:query,count:"10",language:"ko",format:"json"});
-      if(korean) params.set("countryCode","KR");
-      let response;
-      try{
-        response=await request(`https://geocoding-api.open-meteo.com/v1/search?${params}`);
-      }catch(error){
-        throw new Error("지역 검색 서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.");
-      }
-      if(!response.ok){
-        if(response.status===429) throw new Error("검색 요청이 많습니다. 잠시 후 다시 시도해 주세요.");
-        lastError=new Error(`지역 검색 서버 오류 (${response.status})`);
-        continue;
-      }
-      const data=await response.json();
-      if(data.error){lastError=new Error(data.reason||"지역 검색 오류");continue;}
-      const results=(Array.isArray(data.results)?data.results:[])
-        .map(normalizeLocationResult).filter(Boolean)
-        .filter(r=>!korean||!r.countryCode||r.countryCode==="KR");
-      const seen=new Set();
-      const unique=results.filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true;});
-      if(unique.length) return unique;
-    }
-    if(lastError) throw lastError;
-    return [];
+  function asosNumber(value){
+    if(value===null||value===undefined||String(value).trim()==="")return null;
+    const n=Number(value);return Number.isFinite(n)?n:null;
   }
-
-  function applyGardenLocation(result){
-    const input=document.getElementById("gardenPlace");
-    input.value=result.label;
-    input.dataset.resolvedName=result.label;
-    document.getElementById("latitude").value=result.latitude.toFixed(4);
-    document.getElementById("longitude").value=result.longitude.toFixed(4);
-    const status=document.getElementById("placeSearchStatus");
-    status.textContent=`✅ ${result.label} · 날씨 조회 위치 설정 완료`;
-    status.className="location-search-status ok";
-    document.getElementById("placeSearchResults").replaceChildren();
+  function normalizeAsosWeather(json,date,station){
+    if(!json||typeof json!=="object"||json.date!==date||String(json.stationId)!==station||json.dataType!=="observation")
+      throw new Error("기상자료 응답을 확인하지 못했습니다.");
+    const w={date,source:"기상청 ASOS",dataType:"observation",stationId:station,stationName:ASOS_STATIONS[station]};
+    ASOS_FIELDS.forEach(key=>w[key]=asosNumber(json[key]));
+    if(ASOS_FIELDS.every(key=>w[key]===null))throw new Error("사용 가능한 기상 관측값이 없습니다.");
+    return w;
   }
-
-  async function searchGardenPlace(){
-    const input=document.getElementById("gardenPlace");
-    const status=document.getElementById("placeSearchStatus");
-    const resultsEl=document.getElementById("placeSearchResults");
-    const button=document.getElementById("searchPlaceBtn");
-    const query=input.value.trim();
-    const serial=++placeSearchSerial;
-    resultsEl.replaceChildren();
-    if(query.length<2){
-      status.textContent="지역명을 2글자 이상 입력해 주세요.";status.className="location-search-status error";return;
-    }
-    button.disabled=true;
-    status.textContent="지역을 찾는 중입니다…";status.className="location-search-status";
-    try{
-      const results=await lookupGardenLocations(query);
-      if(serial!==placeSearchSerial) return;
-      if(!results.length){
-        throw new Error("검색 결과가 없습니다. 예: 서산시 → 서산 → Seosan 순서로 다시 검색해 보세요.");
-      }
-      if(results.length===1){applyGardenLocation(results[0]);return;}
-      status.textContent="검색 결과가 여러 개입니다. 텃밭이 있는 지역을 선택해 주세요.";
-      results.forEach(result=>{
-        const choice=document.createElement("button");
-        choice.type="button";choice.className="location-result";
-        choice.textContent=result.label;
-        choice.addEventListener("click",()=>applyGardenLocation(result));
-        resultsEl.appendChild(choice);
-      });
-    }catch(error){
-      if(serial!==placeSearchSerial)return;
-      status.textContent=`❌ ${error.message}`;status.className="location-search-status error";
-    }finally{
-      if(serial===placeSearchSerial)button.disabled=false;
-    }
-  }
-
   async function fetchWeather(date){
-    const lat=num(state.project.latitude), lon=num(state.project.longitude);
-    if(lat===null || lon===null) throw new Error("설정에서 텃밭 지역을 검색해 날씨 조회 위치를 먼저 설정해 주세요.");
-    const today=todayStr();
-    let base="https://api.open-meteo.com/v1/forecast";
-    const dDate=new Date(date+"T00:00:00"), dToday=new Date(today+"T00:00:00");
-    const daysAgo=Math.round((dToday-dDate)/(86400000));
-    if(daysAgo>90){
-      base="https://archive-api.open-meteo.com/v1/archive";
-    }
-    const params=new URLSearchParams({
-      latitude:String(lat), longitude:String(lon),
-      start_date:date, end_date:date,
-      daily:"temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration",
-      timezone:"Asia/Seoul"
-    });
-    const res=await fetch(`${base}?${params}`);
-    if(!res.ok) throw new Error("기상 데이터를 불러오지 못했습니다.");
-    const json=await res.json();
-    if(!json.daily?.time?.length) throw new Error("해당 날짜의 기상 데이터가 아직 없습니다.");
-    return {
-      date,
-      mean:num(json.daily.temperature_2m_mean?.[0]),
-      max:num(json.daily.temperature_2m_max?.[0]),
-      min:num(json.daily.temperature_2m_min?.[0]),
-      rain:num(json.daily.precipitation_sum?.[0]),
-      sun:num(json.daily.sunshine_duration?.[0])===null?null:num(json.daily.sunshine_duration?.[0])/3600,
-      source:"Open-Meteo"
-    };
+    const station=String(state.project.stationId||"");
+    if(!validAsosStation(station))throw new Error("설정에서 ASOS 관측지점을 먼저 선택해 주세요.");
+    if(!asosDateValid(date))throw new Error("조회 날짜를 확인해 주세요.");
+    if(date>latestAsosDate())throw new Error("해당 날짜의 확정 일자료가 아직 없습니다. 오늘 관찰은 먼저 기록하고, 자료가 발표된 뒤 날씨를 추가해 주세요.");
+    const params=new URLSearchParams({station,date});
+    let res;
+    try{
+      res=await fetch(`${ASOS_URL}?${params}`,{signal:AbortSignal.timeout(15000)});
+    }catch(error){throw new Error("기상청 날씨 서버에 연결하지 못했습니다. 네트워크를 확인하거나 잠시 후 다시 시도해 주세요.");}
+    let json;
+    try{json=await res.json();}catch{throw new Error("기상자료 응답을 읽지 못했습니다.");}
+    if(!res.ok)throw new Error(typeof json.message==="string"?json.message:"기상자료를 불러오지 못했습니다.");
+    return normalizeAsosWeather(json,date,station);
   }
 
   function renderWeatherTo(prefix,w){
@@ -1662,19 +1563,12 @@
     const p=state.project;
     const ack=document.getElementById("privacyAck"); if(ack && p.cropName) ack.checked=true;
     ["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"].forEach(id=>{
-      const el=document.getElementById(id);
-      if(el) el.value=p[id] ?? "";
+      const el=document.getElementById(id);if(el)el.value=p[id]??"";
     });
-    const place=document.getElementById("gardenPlace");
-    if(place) place.dataset.resolvedName=(p.locationConfirmed && p.gardenPlace)?p.gardenPlace:"";
+    document.getElementById("asosStation").value=validAsosStation(p.stationId)?String(p.stationId):"";
     const status=document.getElementById("placeSearchStatus");
-    if(status){
-      if(p.locationConfirmed && num(p.latitude)!=null && num(p.longitude)!=null){
-        status.textContent=`✅ 날씨 조회 위치가 설정되었습니다. (${fmt(p.latitude,4)}, ${fmt(p.longitude,4)})`; status.className="location-search-status ok";
-      }else{
-        status.textContent="지역명을 입력한 뒤 ‘지역 찾기’를 누르면 날씨 조회용 좌표가 자동 입력됩니다. 개인의 현재 위치(GPS)는 사용하지 않습니다."; status.className="location-search-status";
-      }
-    }
+    status.textContent=validAsosStation(p.stationId)?`선택된 관측지점: ${asosStationLabel(p.stationId)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"텃밭과 가까운 ASOS 관측지점을 선택해 주세요. 기존 지역명과 기록은 그대로 유지됩니다.";
+    status.className=validAsosStation(p.stationId)?"location-search-status ok":"location-search-status";
   }
 
   function showSetup(force=false){
@@ -1770,7 +1664,7 @@
         changeKeyword:document.getElementById("changeKeyword").value.trim(),
         note:document.getElementById("obsNote").value.trim(),
         weatherThought:document.getElementById("weatherThought").value.trim(),
-        weather:currentWeatherForObservation,
+        weather:currentWeatherForObservation?.date===document.getElementById("obsDate").value?currentWeatherForObservation:null,
         photoId,
         createdAt:old?.createdAt||new Date().toISOString(),
         updatedAt:new Date().toISOString()
@@ -1977,35 +1871,28 @@
   document.getElementById("footerPrivacyBtn").addEventListener("click",showPrivacy);
   document.getElementById("closePrivacyBtn").addEventListener("click",hidePrivacy);
   document.getElementById("privacyConfirmBtn").addEventListener("click",hidePrivacy);
-  document.getElementById("searchPlaceBtn").addEventListener("click",searchGardenPlace);
-  document.getElementById("gardenPlace").addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault();searchGardenPlace();} });
-  document.getElementById("gardenPlace").addEventListener("input",e=>{
-    if(e.target.value!==e.target.dataset.resolvedName){
-      placeSearchSerial++;
-      document.getElementById("placeSearchResults").replaceChildren();
-      document.getElementById("searchPlaceBtn").disabled=false;
-      document.getElementById("latitude").value=""; document.getElementById("longitude").value="";
-      const status=document.getElementById("placeSearchStatus");
-      status.textContent="지역명이 바뀌었습니다. ‘지역 찾기’를 눌러 날씨 조회 위치를 다시 설정해 주세요."; status.className="location-search-status";
-    }
+  document.getElementById("asosStation").replaceChildren(new Option("관측지점 선택",""),...Object.entries(ASOS_STATIONS).map(([id,name])=>new Option(`${name} (${id})`,id)));
+  document.getElementById("asosStation").addEventListener("change",e=>{
+    const status=document.getElementById("placeSearchStatus");
+    status.textContent=e.target.value?`선택된 관측지점: ${asosStationLabel(e.target.value)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"관측지점을 선택해 주세요.";
+    status.className=e.target.value?"location-search-status ok":"location-search-status";
   });
-
   document.getElementById("setupForm").addEventListener("submit",e=>{
     e.preventDefault();
-    const lat=num(document.getElementById("latitude").value), lon=num(document.getElementById("longitude").value);
-    if(lat===null || lon===null || document.getElementById("gardenPlace").value!==document.getElementById("gardenPlace").dataset.resolvedName){
-      const status=document.getElementById("placeSearchStatus");
-      status.textContent="❌ ‘지역 찾기’를 눌러 텃밭 지역을 먼저 확인해 주세요."; status.className="location-search-status error";
-      document.getElementById("gardenPlace").focus(); return;
+    const station=document.getElementById("asosStation").value;
+    if(!validAsosStation(station)){
+      document.getElementById("placeSearchStatus").textContent="ASOS 관측지점을 선택해 주세요.";
+      document.getElementById("asosStation").focus();return;
     }
     const ids=["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"];
     ids.forEach(id=>state.project[id]=document.getElementById(id).value);
-    state.project.latitude=lat;
-    state.project.longitude=lon;
+    state.project.stationId=station;
     state.project.locationConfirmed=true;
-    saveState(); hideSetup(); toast("프로젝트 설정을 저장했습니다.");
-    requestPersistentStorage();
-    loadTodayWeather();
+    weatherRequestSerial++;
+    currentWeatherForObservation=null;
+    renderWeatherTo("ow",null);
+    saveState();hideSetup();toast("프로젝트 설정을 저장했습니다.");
+    requestPersistentStorage();loadTodayWeather();
   });
 
   async function handlePhotoSelection(file, sourceLabel){
@@ -2044,23 +1931,35 @@
     const stateEl=document.getElementById("photoSaveState"); stateEl.className="photo-save-state"; stateEl.textContent="";
   });
 
+  document.getElementById("obsDate").addEventListener("change",()=>{
+    weatherRequestSerial++;
+    currentWeatherForObservation=null;
+    renderWeatherTo("ow",null);
+    setStatus("obsStatus","관찰 날짜가 바뀌었습니다. 해당 날짜의 날씨를 다시 가져와 주세요.","warn");
+  });
   document.getElementById("fetchObsWeather").addEventListener("click",async()=>{
     const date=document.getElementById("obsDate").value;
     if(!date){setStatus("obsStatus","관찰 날짜를 먼저 선택해 주세요.","warn");return;}
+    const serial=++weatherRequestSerial;
+    const station=String(state.project.stationId||"");
+    currentWeatherForObservation=null;renderWeatherTo("ow",null);
     try{
-      setStatus("obsStatus","기상 데이터를 불러오는 중입니다.","warn");
-      currentWeatherForObservation=await fetchWeather(date);
-      renderWeatherTo("ow",currentWeatherForObservation);
-      setStatus("obsStatus",`${date} 날씨를 자동 입력했습니다. (Open‑Meteo)`,"ok");
-    }catch(err){setStatus("obsStatus",err.message,"error");}
+      setStatus("obsStatus","기상청 확정 일자료를 불러오는 중입니다.","warn");
+      const w=await fetchWeather(date);
+      if(serial!==weatherRequestSerial||document.getElementById("obsDate").value!==date||String(state.project.stationId||"")!==station)return;
+      currentWeatherForObservation=w;
+      renderWeatherTo("ow",w);
+      setStatus("obsStatus",`${date} · ${asosStationLabel(station)} · 기상청 ASOS 관측자료`,"ok");
+    }catch(err){if(serial===weatherRequestSerial)setStatus("obsStatus",err.message,"error");}
   });
 
   async function loadTodayWeather(){
+    const date=latestAsosDate();
     try{
-      document.getElementById("todayWeatherStatus").textContent="오늘 날씨를 불러오는 중…";
-      const w=await fetchWeather(todayStr());
+      document.getElementById("todayWeatherStatus").textContent="최근 확정 기상자료를 불러오는 중…";
+      const w=await fetchWeather(date);
       renderWeatherTo("w",w);
-      document.getElementById("todayWeatherStatus").textContent=`${state.project.gardenPlace||"설정 위치"} · ${todayStr()} · Open‑Meteo`;
+      document.getElementById("todayWeatherStatus").textContent=`${asosStationLabel(w.stationId)} · ${w.date} · 기상청 ASOS 확정 일자료`;
     }catch(err){
       document.getElementById("todayWeatherStatus").textContent=err.message;
       renderWeatherTo("w",null);
@@ -2090,11 +1989,11 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=22", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=23", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
-  if(!state.project.cropName || !state.project.plantDate) showSetup(true);
+  if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);
   else loadTodayWeather();
 
 })();
