@@ -1,0 +1,1 @@
+Working from the restored ASOS app. The requested interface is city/county/district search, automatic nearby observation-source association, and explicit saving without changing existing observation or photo data.
