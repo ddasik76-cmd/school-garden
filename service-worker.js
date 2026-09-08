@@ -1,6 +1,6 @@
-const CACHE = "school-garden-v14";
+const CACHE = "school-garden-v15";
 const BASE = new URL("./", self.location.href).pathname;
-const CORE = [BASE, BASE + "index.html", BASE + "manifest.webmanifest", BASE + "mobile-fixes.css?v=22"];
+const CORE = [BASE, BASE + "index.html", BASE + "manifest.webmanifest", BASE + "mobile-fixes.css?v=22", BASE + "garden-location-search.js?v=1"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));

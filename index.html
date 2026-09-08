@@ -658,10 +658,14 @@
         <div class="field"><label for="plantDate">파종/정식일 *</label><input id="plantDate" type="date" required></div>
         <div class="field full">
           <label for="gardenPlace">텃밭 지역 *</label>
-          <input id="gardenPlace" required placeholder="예: 팔봉중학교 텃밭, 서산시 팔봉면">
+          <div class="location-search-row">
+            <input id="gardenPlace" required placeholder="예: 서산시, 팔봉면, 팔봉중학교 텃밭" autocomplete="off">
+            <button class="btn secondary" type="button" id="searchPlaceBtn">🔎 지역 찾기</button>
+          </div>
+          <div id="placeSearchResults" class="location-search-results" role="group" aria-label="지역 검색 결과"></div>
           <label for="asosStation">대표 기상 관측지점 *</label>
           <select id="asosStation" required aria-describedby="placeSearchStatus"><option value="">관측지점 선택</option></select>
-          <div id="placeSearchStatus" class="location-search-status">텃밭과 가까운 ASOS 관측지점을 직접 선택하세요. 관측소 자료는 텃밭에서 직접 측정한 값이 아닙니다. GPS와 외부 지역검색을 사용하지 않습니다.</div>
+          <div id="placeSearchStatus" class="location-search-status">지역명을 입력하고 ‘지역 찾기’를 누르세요. 검색 결과에서 대표 관측지점을 선택할 수 있습니다. 검색은 기기에서 처리하며 GPS를 사용하지 않습니다.</div>
           <input id="latitude" type="hidden"><input id="longitude" type="hidden">
         </div>
         <div class="field"><label for="tempMin">적정 최저기온(℃)</label><input id="tempMin" type="number" step="0.1" placeholder="20"></div>
@@ -796,11 +800,12 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
 
+<script src="./garden-location-search.js?v=1"></script>
 <script>
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.11.0";
+  const APP_VERSION = "1.11.1";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const DB_NAME = "gardenClimateJournalDB";
@@ -1560,6 +1565,7 @@
   }
 
   function fillSetup(){
+    window.GardenLocationSearch.clear();
     const p=state.project;
     const ack=document.getElementById("privacyAck"); if(ack && p.cropName) ack.checked=true;
     ["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"].forEach(id=>{
@@ -1567,7 +1573,7 @@
     });
     document.getElementById("asosStation").value=validAsosStation(p.stationId)?String(p.stationId):"";
     const status=document.getElementById("placeSearchStatus");
-    status.textContent=validAsosStation(p.stationId)?`선택된 관측지점: ${asosStationLabel(p.stationId)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"텃밭과 가까운 ASOS 관측지점을 선택해 주세요. 기존 지역명과 기록은 그대로 유지됩니다.";
+    status.textContent=validAsosStation(p.stationId)?`선택된 관측지점: ${asosStationLabel(p.stationId)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"지역명을 검색하거나 아래에서 대표 관측지점을 선택해 주세요. 기존 지역명과 기록은 그대로 유지됩니다.";
     status.className=validAsosStation(p.stationId)?"location-search-status ok":"location-search-status";
   }
 
@@ -1877,6 +1883,7 @@
     status.textContent=e.target.value?`선택된 관측지점: ${asosStationLabel(e.target.value)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"관측지점을 선택해 주세요.";
     status.className=e.target.value?"location-search-status ok":"location-search-status";
   });
+  window.GardenLocationSearch.mount(ASOS_STATIONS);
   document.getElementById("setupForm").addEventListener("submit",e=>{
     e.preventDefault();
     const station=document.getElementById("asosStation").value;
@@ -1989,7 +1996,7 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=23", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=24", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
