@@ -1,0 +1,249 @@
+name: Auto-finalize observation weather
+
+on:
+  push:
+    paths:
+      - '.github/workflows/auto-weather-finalize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch app
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              n = text.count(old)
+              if n != 1:
+                  raise SystemExit(f"{label}: expected 1 match, found {n}")
+              return text.replace(old, new, 1)
+
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          text = replace_once(text, 'const APP_VERSION = "1.11.0";', 'const APP_VERSION = "1.12.0";', 'version')
+
+          old_fetch = '''  async function fetchWeather(date){
+            const station=String(state.project.stationId||"");
+            if(!validAsosStation(station))throw new Error("설정에서 ASOS 관측지점을 먼저 선택해 주세요.");
+            if(!asosDateValid(date))throw new Error("조회 날짜를 확인해 주세요.");
+            if(date>latestAsosDate())throw new Error("해당 날짜의 확정 일자료가 아직 없습니다. 오늘 관찰은 먼저 기록하고, 자료가 발표된 뒤 날씨를 추가해 주세요.");
+            const params=new URLSearchParams({station,date});
+            let res;
+            try{
+              res=await fetch(`${ASOS_URL}?${params}`,{signal:AbortSignal.timeout(15000)});
+            }catch(error){throw new Error("기상청 날씨 서버에 연결하지 못했습니다. 네트워크를 확인하거나 잠시 후 다시 시도해 주세요.");}
+            let json;
+            try{json=await res.json();}catch{throw new Error("기상자료 응답을 읽지 못했습니다.");}
+            if(!res.ok)throw new Error(typeof json.message==="string"?json.message:"기상자료를 불러오지 못했습니다.");
+            return normalizeAsosWeather(json,date,station);
+          }
+          '''
+          new_fetch = '''  async function fetchWeatherForStation(date,station){
+            station=String(station||"");
+            if(!validAsosStation(station))throw new Error("설정에서 ASOS 관측지점을 먼저 선택해 주세요.");
+            if(!asosDateValid(date))throw new Error("조회 날짜를 확인해 주세요.");
+            if(date>latestAsosDate())throw new Error("이 날짜의 확정 일자료는 아직 집계 중입니다. 관찰 기록은 먼저 저장하세요. 다음날 오전 11시 이후 앱을 열면 날씨가 자동으로 확정됩니다.");
+            const params=new URLSearchParams({station,date});
+            let res;
+            try{
+              res=await fetch(`${ASOS_URL}?${params}`,{signal:AbortSignal.timeout(15000)});
+            }catch(error){throw new Error("기상청 날씨 서버에 연결하지 못했습니다. 네트워크를 확인하거나 잠시 후 다시 시도해 주세요.");}
+            let json;
+            try{json=await res.json();}catch{throw new Error("기상자료 응답을 읽지 못했습니다.");}
+            if(!res.ok)throw new Error(typeof json.message==="string"?json.message:"기상자료를 불러오지 못했습니다.");
+            return normalizeAsosWeather(json,date,station);
+          }
+
+          async function fetchWeather(date){
+            return fetchWeatherForStation(date,state.project.stationId);
+          }
+
+          function isFinalAsosWeather(weather,date,station){
+            if(!weather || weather.date!==date || weather.dataType!=="observation" || weather.source!=="기상청 ASOS")return false;
+            return !station || String(weather.stationId||"")===String(station);
+          }
+
+          function observationWeatherStation(o){
+            return String(o?.weatherStationId || o?.weather?.stationId || state.project.stationId || "");
+          }
+
+          function observationNeedsWeatherSync(o,latest=latestAsosDate()){
+            if(!o || !asosDateValid(o.date) || o.date>latest)return false;
+            const station=observationWeatherStation(o);
+            if(!validAsosStation(station))return false;
+            if(isFinalAsosWeather(o.weather,o.date,station))return false;
+            if(o.weather && o.weatherStatus!=="pending" && o.weatherStatus!=="provisional")return false;
+            return true;
+          }
+
+          function observationWeatherStatusText(o){
+            const station=observationWeatherStation(o);
+            if(isFinalAsosWeather(o?.weather,o?.date,station))return "✅ 기상청 확정 일자료";
+            if(o?.weather && o.weatherStatus!=="pending" && o.weatherStatus!=="provisional")return o.weather.source||"저장된 기상 데이터";
+            if(asosDateValid(o?.date) && o.date>latestAsosDate())return "🕒 기상자료 집계 중 · 다음날 11시 이후 자동 확정";
+            return "↻ 기상자료 업데이트 대기";
+          }
+
+          let weatherSyncRunning=false;
+          async function syncPendingObservationWeather({silent=false,maxRequests=8}={}){
+            if(weatherSyncRunning || !Array.isArray(state.observations) || !state.observations.length)return 0;
+            weatherSyncRunning=true;
+            try{
+              const latest=latestAsosDate();
+              const groups=new Map();
+              for(const o of state.observations){
+                if(!observationNeedsWeatherSync(o,latest))continue;
+                const station=observationWeatherStation(o);
+                const key=`${station}|${o.date}`;
+                if(!groups.has(key))groups.set(key,{station,date:o.date,ids:[]});
+                groups.get(key).ids.push(o.id);
+              }
+              let requests=0,updated=0;
+              for(const group of groups.values()){
+                if(requests>=maxRequests)break;
+                requests++;
+                try{
+                  const weather=await fetchWeatherForStation(group.date,group.station);
+                  const ids=new Set(group.ids);
+                  const now=new Date().toISOString();
+                  state.observations=state.observations.map(o=>ids.has(o.id)?{
+                    ...o,
+                    weather,
+                    weatherStatus:"final",
+                    weatherStationId:group.station,
+                    weatherUpdatedAt:now
+                  }:o);
+                  updated+=group.ids.length;
+                }catch(err){
+                  console.warn("observation weather sync skipped",group.date,group.station,err?.message||err);
+                }
+              }
+              if(updated){
+                saveState();
+                if(!silent)toast(`✅ 기상청 확정 일자료 ${updated}건 자동 업데이트`);
+              }
+              return updated;
+            }finally{
+              weatherSyncRunning=false;
+            }
+          }
+          '''
+          text = replace_once(text, old_fetch, new_fetch, 'weather adapter')
+
+          text = replace_once(text,
+              '      const weather=o.weather||{};\n      const div=document.createElement("div");',
+              '      const weather=o.weather||{};\n      const weatherStatus=observationWeatherStatusText(o);\n      const div=document.createElement("div");',
+              'timeline status variable')
+          text = replace_once(text,
+              '${weather.mean!=null?`평균 ${fmt(weather.mean)}℃ · 강수 ${fmt(weather.rain)}mm · 일조 ${fmt(weather.sun)}h`:"기상 데이터 없음"}',
+              '${weather.mean!=null?`평균 ${fmt(weather.mean)}℃ · 강수 ${fmt(weather.rain)}mm · 일조 ${fmt(weather.sun)}h · ${weatherStatus}`:weatherStatus}',
+              'timeline weather line')
+
+          text = replace_once(text,
+              '      const obs={\n        id,\n        date:document.getElementById("obsDate").value,',
+              '''      const observationDate=document.getElementById("obsDate").value;
+              const savedWeather=currentWeatherForObservation?.date===observationDate?currentWeatherForObservation:null;
+              const weatherStationId=String(savedWeather?.stationId || old?.weatherStationId || state.project.stationId || "");
+              const weatherStatus=savedWeather
+                ? (isFinalAsosWeather(savedWeather,observationDate,weatherStationId)?"final":(old?.weatherStatus||"legacy"))
+                : "pending";
+              const obs={
+                id,
+                date:observationDate,''',
+              'observation weather metadata prelude')
+          text = replace_once(text,
+              '        weather:currentWeatherForObservation?.date===document.getElementById("obsDate").value?currentWeatherForObservation:null,\n        photoId,',
+              '''        weather:savedWeather,
+              weatherStatus,
+              weatherStationId,
+              weatherUpdatedAt:savedWeather?new Date().toISOString():(old?.weatherUpdatedAt||null),
+              photoId,''',
+              'observation weather metadata fields')
+          text = replace_once(text,
+              '      setStatus("obsStatus", editId?"관찰 기록을 수정했습니다.":"관찰 기록을 저장했습니다. 사진도 기기 저장소에서 확인했습니다.","ok");\n      toast(editId?"수정 완료":"🌱 관찰 + 사진 저장 완료");',
+              '''      const weatherNotice=obs.weatherStatus==="pending"?" 날씨는 집계 중이며 다음날 오전 11시 이후 앱을 열면 자동으로 확정됩니다.":"";
+              setStatus("obsStatus", (editId?"관찰 기록을 수정했습니다.":"관찰 기록을 저장했습니다.")+weatherNotice,"ok");
+              toast(editId?"수정 완료":"🌱 관찰 기록 저장 완료");
+              syncPendingObservationWeather({silent:true});''',
+              'observation save message')
+
+          text = replace_once(text,
+              '    requestPersistentStorage();loadTodayWeather();\n  });',
+              '    requestPersistentStorage();loadTodayWeather();syncPendingObservationWeather({silent:false});\n  });',
+              'setup sync hook')
+
+          text = replace_once(text,
+              '  document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);\n\n  document.getElementById("obsDate").value=todayStr();',
+              '''  document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
+
+          document.addEventListener("visibilitychange",()=>{
+            if(document.visibilityState==="visible" && validAsosStation(state.project.stationId)){
+              syncPendingObservationWeather({silent:false});
+            }
+          });
+
+          document.getElementById("obsDate").value=todayStr();''',
+              'foreground sync hook')
+
+          text = replace_once(text,
+              'navigator.serviceWorker.register("/school-garden/service-worker.js?v=23"',
+              'navigator.serviceWorker.register("/school-garden/service-worker.js?v=24"',
+              'service worker registration')
+          text = replace_once(text,
+              '  if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);\n  else loadTodayWeather();',
+              '  if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);\n  else { loadTodayWeather(); syncPendingObservationWeather({silent:false}); }',
+              'startup sync hook')
+
+          p.write_text(text,encoding='utf-8')
+
+          sw=Path('service-worker.js')
+          swtext=sw.read_text(encoding='utf-8')
+          swtext=replace_once(swtext,'const CACHE = "school-garden-v14";','const CACHE = "school-garden-v15";','cache version')
+          sw.write_text(swtext,encoding='utf-8')
+      - name: Syntax and regression tests
+        run: |
+          node tests/asos-client.test.cjs
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const vm=require('node:vm');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('index.html','utf8');
+          assert.ok(html.includes('const APP_VERSION = "1.12.0";'));
+          const blocks=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+          const app=blocks.at(-1)[1];
+          new Function(app);
+          const start=app.indexOf('  // 기상청 ASOS 일자료. 관측지점은 학생이 직접 선택합니다.');
+          const end=app.indexOf('  function renderWeatherTo(prefix,w){',start);
+          const state={project:{stationId:'129'},observations:[]};
+          const ctx=vm.createContext({state,URLSearchParams,AbortSignal,Intl,Date,Number,String,Object,Array,Set,Map,fetch:async()=>{throw new Error('not called')},console,localStorage:{setItem(){}}});
+          vm.runInContext(app.slice(start,end),ctx);
+          const call=x=>vm.runInContext(x,ctx);
+          assert.equal(call('observationNeedsWeatherSync({date:"2026-09-16",weather:null,weatherStatus:"pending",weatherStationId:"129"},"2026-09-15")'),false);
+          assert.equal(call('observationNeedsWeatherSync({date:"2026-09-16",weather:null,weatherStatus:"pending",weatherStationId:"129"},"2026-09-16")'),true);
+          assert.equal(call('observationNeedsWeatherSync({date:"2026-09-16",weather:{date:"2026-09-16",source:"Open-Meteo",mean:20},weatherStatus:"legacy",weatherStationId:"129"},"2026-09-16")'),false);
+          assert.equal(call('observationNeedsWeatherSync({date:"2026-09-16",weather:{date:"2026-09-16",source:"기상청 ASOS",dataType:"observation",stationId:"129",mean:20},weatherStatus:"final",weatherStationId:"129"},"2026-09-16")'),false);
+          assert.ok(html.includes('다음날 오전 11시 이후 앱을 열면 자동으로 확정됩니다.'));
+          assert.ok(html.includes('weatherStatus:"final"'));
+          assert.ok(html.includes('syncPendingObservationWeather({silent:false})'));
+          assert.ok(html.includes('const STORAGE_KEY = "gardenClimateJournal.v1";'));
+          assert.ok(html.includes('const DB_NAME = "gardenClimateJournalDB";'));
+          console.log('PASS: app syntax, pending/final logic, legacy preservation, storage compatibility');
+          NODE
+      - name: Commit tested update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html service-worker.js
+          git commit -m "Auto-finalize saved observation weather"
+          git push origin HEAD:main
