@@ -800,7 +800,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.11.0";
+  const APP_VERSION = "1.12.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const DB_NAME = "gardenClimateJournalDB";
@@ -1140,11 +1140,11 @@
     if(ASOS_FIELDS.every(key=>w[key]===null))throw new Error("사용 가능한 기상 관측값이 없습니다.");
     return w;
   }
-  async function fetchWeather(date){
-    const station=String(state.project.stationId||"");
+  async function fetchWeather(date,stationId=state.project.stationId){
+    const station=String(stationId||"");
     if(!validAsosStation(station))throw new Error("설정에서 ASOS 관측지점을 먼저 선택해 주세요.");
     if(!asosDateValid(date))throw new Error("조회 날짜를 확인해 주세요.");
-    if(date>latestAsosDate())throw new Error("해당 날짜의 확정 일자료가 아직 없습니다. 오늘 관찰은 먼저 기록하고, 자료가 발표된 뒤 날씨를 추가해 주세요.");
+    if(date>latestAsosDate())throw new Error("해당 날짜의 확정 일자료가 아직 없습니다. 관찰은 먼저 저장하세요. 다음날 오전 11시 이후 앱을 열면 자동으로 확정됩니다.");
     const params=new URLSearchParams({station,date});
     let res;
     try{
@@ -1155,6 +1155,69 @@
     if(!res.ok)throw new Error(typeof json.message==="string"?json.message:"기상자료를 불러오지 못했습니다.");
     return normalizeAsosWeather(json,date,station);
   }
+
+  function isFinalAsosWeather(weather,date,station,now=new Date()){
+    return !!(weather && weather.source==="기상청 ASOS" &&
+      weather.dataType==="observation" && weather.date===date &&
+      asosDateValid(date) && date<=latestAsosDate(now) && validAsosStation(station) &&
+      String(weather.stationId)===String(station) &&
+      ASOS_FIELDS.some(key=>asosNumber(weather[key])!==null));
+  }
+
+  function observationWeatherFields(date,old,candidate,now=new Date()){
+    const station=String(old?.stationId||old?.weather?.stationId||state.project.stationId||"");
+    // Preserve legacy values and finalized records when editing student text.
+    if(old?.date===date && (old.weatherStatus==="final" || old.weather && old.weatherStatus!=="pending")){
+      const fields={weather:old.weather,stationId:station};
+      if(old.weatherStatus!==undefined)fields.weatherStatus=old.weatherStatus;
+      return fields;
+    }
+    if(isFinalAsosWeather(candidate,date,station,now))return {weather:candidate,stationId:station,weatherStatus:"final"};
+    return {weather:old?.date===date?(old.weather||null):null,stationId:station,weatherStatus:"pending"};
+  }
+
+  function observationWeatherStatusText(observation){
+    if(observation.weatherStatus==="pending")return "🕒 기상자료 집계 중 · 다음날 11시 이후 자동 확정";
+    if(observation.weatherStatus==="final")return "✅ 기상청 확정 일자료";
+    return "";
+  }
+
+  let pendingWeatherSync=null;
+  function syncPendingObservationWeather(now=new Date()){
+    if(pendingWeatherSync)return pendingWeatherSync;
+    pendingWeatherSync=finalizePendingObservationWeather(now).finally(()=>{pendingWeatherSync=null;});
+    return pendingWeatherSync;
+  }
+
+  async function finalizePendingObservationWeather(now){
+    const latestDate=latestAsosDate(now);
+    const requests=new Map();
+    // Only explicit pending records qualify. Never guess a legacy record's station.
+    for(const original of [...state.observations]){
+      const {date,stationId}=original;
+      if(original.weatherStatus!=="pending" || !asosDateValid(date) || date>latestDate || !validAsosStation(stationId))continue;
+      try{
+        const key=`${stationId}:${date}`;
+        if(!requests.has(key))requests.set(key,fetchWeather(date,stationId));
+        const weather=await requests.get(key);
+        if(!isFinalAsosWeather(weather,date,stationId,now))continue;
+        // Editing, deletion, or ZIP restore while awaiting must not be overwritten.
+        const index=state.observations.indexOf(original);
+        if(index<0 || original.weatherStatus!=="pending" || original.date!==date || original.stationId!==stationId)continue;
+        const observations=state.observations.slice();
+        observations[index]={...original,weather,weatherStatus:"final"};
+        const next={...state,observations};
+        // Commit in memory only after durable storage succeeds; leave pending on failure.
+        localStorage.setItem(STORAGE_KEY,JSON.stringify(next));
+        state=next;
+        renderAll();
+      }catch(error){
+        // A failed request/write leaves the whole record untouched for the next visit.
+        console.warn("기상자료 자동 확정을 다음 접속 때 다시 시도합니다.",error);
+      }
+    }
+  }
+
 
   function renderWeatherTo(prefix,w){
     const map={Mean:"mean",Max:"max",Min:"min",Rain:"rain",Sun:"sun"};
@@ -1176,6 +1239,7 @@
     for(const o of visible){
       const photoUrl=o.photoId ? await blobURL(o.photoId) : "";
       const weather=o.weather||{};
+      const weatherStatus=observationWeatherStatusText(o);
       const div=document.createElement("div");
       div.className="timeline-item";
       div.innerHTML=`
@@ -1184,6 +1248,7 @@
           <div class="timeline-head">
             <div><strong>${esc(o.date)} ${o.changeKeyword?`· ${esc(o.changeKeyword)}`:""}</strong>
               <div class="subtle">${weather.mean!=null?`평균 ${fmt(weather.mean)}℃ · 강수 ${fmt(weather.rain)}mm · 일조 ${fmt(weather.sun)}h`:"기상 데이터 없음"}</div>
+              ${weatherStatus?`<div class="subtle">${weatherStatus}</div>`:""}
             </div>
             ${containerId==="observationTimeline"?`<div class="actions" style="margin:0">
               <button class="btn small outline edit-observation" data-id="${o.id}">수정</button>
@@ -1581,6 +1646,7 @@
   }
 
   function resetObservationForm(){
+    weatherRequestSerial++;
     document.getElementById("observationForm").reset();
     document.getElementById("obsId").value="";
     document.getElementById("obsDate").value=todayStr();
@@ -1600,6 +1666,7 @@
 
   async function editObservation(id){
     const o=state.observations.find(x=>x.id===id); if(!o) return;
+    weatherRequestSerial++;
     removePhotoOnSave=false;
     showPage("observe");
     document.getElementById("obsId").value=o.id;
@@ -1651,7 +1718,12 @@
         await requestPersistentStorage();
       }
 
+      const date=document.getElementById("obsDate").value;
+      // Re-read after photo storage awaits: a background sync may have finalized this record.
+      const latest=editId?state.observations.find(x=>x.id===editId):null;
+      const weatherFields=observationWeatherFields(date,latest,currentWeatherForObservation);
       const obs={
+        ...latest,
         id,
         date:document.getElementById("obsDate").value,
         heightCm:document.getElementById("heightCm").value,
@@ -1664,7 +1736,7 @@
         changeKeyword:document.getElementById("changeKeyword").value.trim(),
         note:document.getElementById("obsNote").value.trim(),
         weatherThought:document.getElementById("weatherThought").value.trim(),
-        weather:currentWeatherForObservation?.date===document.getElementById("obsDate").value?currentWeatherForObservation:null,
+        ...weatherFields,
         photoId,
         createdAt:old?.createdAt||new Date().toISOString(),
         updatedAt:new Date().toISOString()
@@ -1675,6 +1747,7 @@
       resetObservationForm();
       setStatus("obsStatus", editId?"관찰 기록을 수정했습니다.":"관찰 기록을 저장했습니다. 사진도 기기 저장소에서 확인했습니다.","ok");
       toast(editId?"수정 완료":"🌱 관찰 + 사진 저장 완료");
+      void syncPendingObservationWeather();
     }catch(err){
       console.error(err);
       setStatus("obsStatus",`저장하지 못했습니다: ${err.message || "알 수 없는 오류"}`,"error");
@@ -1941,12 +2014,13 @@
     const date=document.getElementById("obsDate").value;
     if(!date){setStatus("obsStatus","관찰 날짜를 먼저 선택해 주세요.","warn");return;}
     const serial=++weatherRequestSerial;
-    const station=String(state.project.stationId||"");
+    const editing=state.observations.find(x=>x.id===document.getElementById("obsId").value);
+    const station=String(editing?.stationId||editing?.weather?.stationId||state.project.stationId||"");
     currentWeatherForObservation=null;renderWeatherTo("ow",null);
     try{
       setStatus("obsStatus","기상청 확정 일자료를 불러오는 중입니다.","warn");
-      const w=await fetchWeather(date);
-      if(serial!==weatherRequestSerial||document.getElementById("obsDate").value!==date||String(state.project.stationId||"")!==station)return;
+      const w=await fetchWeather(date,station);
+      if(serial!==weatherRequestSerial||document.getElementById("obsDate").value!==date)return;
       currentWeatherForObservation=w;
       renderWeatherTo("ow",w);
       setStatus("obsStatus",`${date} · ${asosStationLabel(station)} · 기상청 ASOS 관측자료`,"ok");
@@ -1985,16 +2059,22 @@
   document.getElementById("printReportBtn").addEventListener("click",printReport);
   document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
 
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible")void syncPendingObservationWeather();
+  });
+  window.addEventListener("pageshow",()=>void syncPendingObservationWeather());
+
   document.getElementById("obsDate").value=todayStr();
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=23", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=24", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
   if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);
   else loadTodayWeather();
+  void syncPendingObservationWeather();
 
 })();
 </script>

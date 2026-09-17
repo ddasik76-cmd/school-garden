@@ -58,7 +58,7 @@ const call = (expr) => vm.runInContext(expr, context);
   assert.ok(!html.includes('api.open-meteo.com/v1/forecast'));
   assert.ok(html.includes('id="asosStation"'));
   assert.ok(html.includes('weatherRequestSerial++'));
-  assert.ok(html.includes('currentWeatherForObservation?.date===document.getElementById("obsDate").value'));
+  assert.ok(html.includes('observationWeatherFields(date,latest,currentWeatherForObservation)'));
   console.log("PASS: existing storage/backup compatibility and stale-weather guard");
   console.log("All 5 ASOS client test groups passed.");
 })().catch(err => {console.error(err);process.exitCode=1;});
