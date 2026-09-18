@@ -413,7 +413,7 @@
         <button class="btn small secondary" id="refreshTodayWeather">새로고침</button>
       </div>
       <div class="card">
-        <div id="todayWeatherStatus" class="subtle">날씨를 불러오려면 설정에서 ASOS 관측지점을 선택하세요.</div>
+        <div id="todayWeatherStatus" class="subtle">날씨를 불러오려면 설정에서 텃밭 지역(시·군·구)을 검색해 저장하세요.</div>
         <div class="weather-grid">
           <div class="weather-item"><span>평균기온</span><strong id="wMean">-</strong></div>
           <div class="weather-item"><span>최고기온</span><strong id="wMax">-</strong></div>
@@ -615,7 +615,7 @@
           <ul class="privacy-list">
             <li>작물 정보·관찰·성찰은 이 브라우저의 <strong>localStorage</strong>에 저장됩니다.</li>
             <li>사진은 압축 후 이 브라우저의 <strong>IndexedDB</strong>에 저장됩니다.</li>
-            <li>날씨 조회에는 선택한 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관합니다. 호스팅·CDN 사업자는 일반적인 접속정보를 처리할 수 있습니다.</li>
+            <li>날씨 조회에는 지역 검색으로 자동 연결된 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관합니다. 호스팅·CDN 사업자는 일반적인 접속정보를 처리할 수 있습니다.</li>
             <li>브라우저 데이터 삭제·기기 교체 전에 <strong>ZIP 백업</strong>을 받아야 기록을 안전하게 옮길 수 있습니다.</li>
             <li>사진에는 학생 얼굴, 이름표, 개인 연락처 등 개인을 알아볼 수 있는 정보가 나오지 않도록 합니다.</li>
           </ul>
@@ -657,11 +657,16 @@
         <div class="field"><label for="variety">품종</label><input id="variety" placeholder="예: 방울토마토"></div>
         <div class="field"><label for="plantDate">파종/정식일 *</label><input id="plantDate" type="date" required></div>
         <div class="field full">
-          <label for="gardenPlace">텃밭 지역 *</label>
-          <input id="gardenPlace" required placeholder="예: 팔봉중학교 텃밭, 서산시 팔봉면">
-          <label for="asosStation">대표 기상 관측지점 *</label>
-          <select id="asosStation" required aria-describedby="placeSearchStatus"><option value="">관측지점 선택</option></select>
-          <div id="placeSearchStatus" class="location-search-status">텃밭과 가까운 ASOS 관측지점을 직접 선택하세요. 관측소 자료는 텃밭에서 직접 측정한 값이 아닙니다. GPS와 외부 지역검색을 사용하지 않습니다.</div>
+          <label for="gardenPlace">텃밭 지역(시·군·구) *</label>
+          <div class="location-search-row">
+            <input id="gardenPlace" required autocomplete="off" placeholder="예: 충남 서산시, 아산시, 서울 강남구">
+            <button class="btn secondary" type="button" id="findNearestStationBtn">🔎 지역 찾기</button>
+          </div>
+          <input id="asosStation" type="hidden">
+          <div id="placeSearchStatus" class="location-search-status">시·군·구를 입력한 뒤 ‘지역 찾기’를 누르면 가까운 기상청 ASOS 관측지점을 자동으로 연결합니다. GPS와 외부 지역검색 API는 사용하지 않습니다.</div>
+          <div class="actions" style="margin-top:8px">
+            <button class="btn small secondary" type="button" id="savePlaceBtn" disabled>💾 지역 저장</button>
+          </div>
           <input id="latitude" type="hidden"><input id="longitude" type="hidden">
         </div>
         <div class="field"><label for="tempMin">적정 최저기온(℃)</label><input id="tempMin" type="number" step="0.1" placeholder="20"></div>
@@ -674,7 +679,7 @@
         <strong>🔒 저장 전 확인</strong>
         <ul class="privacy-list">
           <li>학생의 기록과 사진은 서버가 아니라 현재 기기 브라우저에 저장됩니다.</li>
-          <li>날씨 조회 시 선택한 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관하며 GPS는 사용하지 않습니다.</li>
+          <li>날씨 조회 시 지역 검색으로 자동 연결된 ASOS 관측지점 번호와 날짜만 Firebase 날씨 함수로 전송됩니다. 기상청 인증키는 서버에 보관하며 GPS는 사용하지 않습니다.</li>
           <li>공용기기에서는 사용 후 반드시 PDF/ZIP 백업 뒤 데이터를 삭제하세요.</li>
         </ul>
         <label class="setup-consent">
@@ -728,7 +733,7 @@
       <section class="policy-section">
         <h3>제4조 개인정보의 제3자 제공</h3>
         <p>서비스 개발자는 이용자의 이름, 사진, 관찰 및 성찰 기록을 수집하지 않으며 제3자에게 제공하지 않습니다.</p>
-        <p>날씨 기능은 선택한 <strong>ASOS 관측지점 번호와 조회 날짜</strong>를 Firebase Functions로 전송하고, 서버에서 기상청 API를 호출합니다. 학생 이름·사진·관찰 내용은 날씨 요청에 포함하지 않으며 개인의 현재 위치(GPS)는 사용하지 않습니다.</p>
+        <p>날씨 기능은 입력한 시·군·구에 자동 연결된 <strong>ASOS 관측지점 번호와 조회 날짜</strong>를 Firebase Functions로 전송하고, 서버에서 기상청 API를 호출합니다. 학생 이름·사진·관찰 내용은 날씨 요청에 포함하지 않으며 개인의 현재 위치(GPS)는 사용하지 않습니다.</p>
       </section>
 
       <section class="policy-section">
@@ -800,7 +805,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.12.0";
+  const APP_VERSION = "1.13.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const DB_NAME = "gardenClimateJournalDB";
@@ -1114,6 +1119,144 @@
   const ASOS_STATIONS=Object.freeze({"90":"속초","93":"북춘천","95":"철원","98":"동두천","99":"파주","100":"대관령","101":"춘천","102":"백령도","104":"북강릉","105":"강릉","106":"동해","108":"서울","112":"인천","114":"원주","115":"울릉도","119":"수원","121":"영월","127":"충주","129":"서산","130":"울진","131":"청주","133":"대전","135":"추풍령","136":"안동","137":"상주","138":"포항","140":"군산","143":"대구","146":"전주","152":"울산","155":"창원","156":"광주","159":"부산","162":"통영","165":"목포","168":"여수","169":"흑산도","170":"완도","172":"고창","174":"순천","177":"홍성","184":"제주","185":"고산","188":"성산","189":"서귀포","192":"진주","201":"강화","202":"양평","203":"이천","211":"인제","212":"홍천","216":"태백","217":"정선군","221":"제천","226":"보은","232":"천안","235":"보령","236":"부여","238":"금산","239":"세종","243":"부안","244":"임실","245":"정읍","247":"남원","248":"장수","251":"고창군","252":"영광군","253":"김해시","254":"순창군","255":"북창원","257":"양산시","258":"보성군","259":"강진군","260":"장흥","261":"해남","262":"고흥","263":"의령군","264":"함양군","266":"광양시","268":"진도군","271":"봉화","272":"영주","273":"문경","276":"청송군","277":"영덕","278":"의성","279":"구미","281":"영천","283":"경주시","284":"거창","285":"합천","288":"밀양","289":"산청","294":"거제","295":"남해"});
   const ASOS_FIELDS=["mean","max","min","rain","sun"];
 
+  // 시·군·구 → 가까운 ASOS 관측지점. 외부 지오코딩 없이 기기 안에서 검색합니다.
+  const REGION_STATION_AREAS=Object.freeze([
+    ["108","서울특별시","서울",["서울특별시","서울","종로구","중구","용산구","성동구","광진구","동대문구","중랑구","성북구","강북구","도봉구","노원구","은평구","서대문구","마포구","양천구","강서구","구로구","금천구","영등포구","동작구","관악구","서초구","강남구","송파구","강동구"]],
+    ["159","부산광역시","부산",["부산광역시","부산","중구","서구","동구","영도구","부산진구","동래구","남구","북구","해운대구","사하구","금정구","강서구","연제구","수영구","사상구","기장군"]],
+    ["143","대구광역시","대구",["대구광역시","대구","중구","동구","서구","남구","북구","수성구","달서구","달성군"]],
+    ["112","인천광역시","인천",["인천광역시","인천","중구","동구","미추홀구","연수구","남동구","부평구","계양구","서구","옹진군"]],
+    ["201","인천광역시","인천",["강화군"]],
+    ["156","광주광역시","광주",["광주광역시","광주","동구","서구","남구","북구","광산구"]],
+    ["133","대전광역시","대전",["대전광역시","대전","동구","중구","서구","유성구","대덕구"]],
+    ["152","울산광역시","울산",["울산광역시","울산","중구","남구","동구","북구","울주군"]],
+    ["239","세종특별자치시","세종",["세종특별자치시","세종시","세종"]],
+    ["119","경기도","경기",["수원시","성남시","안양시","평택시","안산시","과천시","군포시","의왕시","오산시","용인시","안성시","화성시"]],
+    ["108","경기도","경기",["광명시","구리시","하남시"]],
+    ["112","경기도","경기",["부천시","시흥시"]],
+    ["98","경기도","경기",["의정부시","동두천시","양주시","포천시"]],
+    ["99","경기도","경기",["고양시","파주시"]],
+    ["201","경기도","경기",["김포시"]],
+    ["203","경기도","경기",["이천시","여주시","광주시"]],
+    ["202","경기도","경기",["남양주시","양평군"]],
+    ["95","경기도","경기",["연천군"]],
+    ["101","경기도","경기",["가평군"]],
+    ["101","강원특별자치도","강원",["춘천시","화천군"]],
+    ["114","강원특별자치도","강원",["원주시","횡성군"]],
+    ["105","강원특별자치도","강원",["강릉시"]],
+    ["106","강원특별자치도","강원",["동해시","삼척시"]],
+    ["216","강원특별자치도","강원",["태백시"]],
+    ["90","강원특별자치도","강원",["속초시","고성군","양양군"]],
+    ["212","강원특별자치도","강원",["홍천군"]],
+    ["121","강원특별자치도","강원",["영월군"]],
+    ["100","강원특별자치도","강원",["평창군"]],
+    ["217","강원특별자치도","강원",["정선군"]],
+    ["95","강원특별자치도","강원",["철원군"]],
+    ["93","강원특별자치도","강원",["양구군"]],
+    ["211","강원특별자치도","강원",["인제군"]],
+    ["131","충청북도","충북",["청주시","증평군","진천군"]],
+    ["127","충청북도","충북",["충주시","음성군"]],
+    ["221","충청북도","충북",["제천시","단양군"]],
+    ["226","충청북도","충북",["보은군","괴산군"]],
+    ["133","충청북도","충북",["옥천군"]],
+    ["135","충청북도","충북",["영동군"]],
+    ["232","충청남도","충남",["천안시","아산시"]],
+    ["239","충청남도","충남",["공주시"]],
+    ["235","충청남도","충남",["보령시","서천군"]],
+    ["129","충청남도","충남",["서산시","당진시","태안군"]],
+    ["236","충청남도","충남",["논산시","부여군"]],
+    ["133","충청남도","충남",["계룡시"]],
+    ["238","충청남도","충남",["금산군"]],
+    ["177","충청남도","충남",["청양군","홍성군","예산군"]],
+    ["146","전북특별자치도","전북",["전주시","김제시","완주군"]],
+    ["140","전북특별자치도","전북",["군산시","익산시"]],
+    ["245","전북특별자치도","전북",["정읍시"]],
+    ["247","전북특별자치도","전북",["남원시"]],
+    ["248","전북특별자치도","전북",["진안군","무주군","장수군"]],
+    ["244","전북특별자치도","전북",["임실군"]],
+    ["254","전북특별자치도","전북",["순창군"]],
+    ["251","전북특별자치도","전북",["고창군"]],
+    ["243","전북특별자치도","전북",["부안군"]],
+    ["165","전라남도","전남",["목포시","영암군","무안군","함평군","신안군"]],
+    ["168","전라남도","전남",["여수시"]],
+    ["174","전라남도","전남",["순천시","곡성군","구례군"]],
+    ["156","전라남도","전남",["나주시","담양군","화순군","장성군"]],
+    ["266","전라남도","전남",["광양시"]],
+    ["262","전라남도","전남",["고흥군"]],
+    ["258","전라남도","전남",["보성군"]],
+    ["260","전라남도","전남",["장흥군"]],
+    ["259","전라남도","전남",["강진군"]],
+    ["261","전라남도","전남",["해남군"]],
+    ["252","전라남도","전남",["영광군"]],
+    ["170","전라남도","전남",["완도군"]],
+    ["268","전라남도","전남",["진도군"]],
+    ["138","경상북도","경북",["포항시"]],
+    ["283","경상북도","경북",["경주시"]],
+    ["279","경상북도","경북",["김천시","구미시","성주군","칠곡군"]],
+    ["136","경상북도","경북",["안동시","예천군"]],
+    ["272","경상북도","경북",["영주시"]],
+    ["281","경상북도","경북",["영천시"]],
+    ["137","경상북도","경북",["상주시"]],
+    ["273","경상북도","경북",["문경시"]],
+    ["143","경상북도","경북",["경산시","청도군","고령군"]],
+    ["278","경상북도","경북",["군위군","의성군"]],
+    ["276","경상북도","경북",["청송군"]],
+    ["271","경상북도","경북",["영양군","봉화군"]],
+    ["277","경상북도","경북",["영덕군"]],
+    ["130","경상북도","경북",["울진군"]],
+    ["115","경상북도","경북",["울릉군"]],
+    ["155","경상남도","경남",["창원시"]],
+    ["192","경상남도","경남",["진주시","사천시"]],
+    ["162","경상남도","경남",["통영시","고성군"]],
+    ["253","경상남도","경남",["김해시"]],
+    ["288","경상남도","경남",["밀양시","창녕군"]],
+    ["294","경상남도","경남",["거제시"]],
+    ["257","경상남도","경남",["양산시"]],
+    ["263","경상남도","경남",["의령군"]],
+    ["255","경상남도","경남",["함안군"]],
+    ["295","경상남도","경남",["남해군","하동군"]],
+    ["289","경상남도","경남",["산청군"]],
+    ["264","경상남도","경남",["함양군"]],
+    ["284","경상남도","경남",["거창군"]],
+    ["285","경상남도","경남",["합천군"]],
+    ["184","제주특별자치도","제주",["제주특별자치도","제주도","제주시"]],
+    ["189","제주특별자치도","제주",["서귀포시"]]
+  ]);
+
+  function normalizeRegionQuery(value){
+    return String(value||"").toLowerCase().replace(/[\s,.-·()]/g,"");
+  }
+  function regionAliases(province,shortName,name){
+    const set=new Set([name,shortName+name,province+name]);
+    const stripped=name.replace(/(특별자치시|특별시|광역시|시|군|구)$/,"");
+    if(stripped.length>=2)set.add(stripped);
+    return [...set].map(normalizeRegionQuery).filter(Boolean);
+  }
+  function findNearestStationByRegion(query){
+    const q=normalizeRegionQuery(query);
+    if(q.length<2)return {ok:false,reason:"short",candidates:[]};
+    const byStation=new Map();
+    for(const [station,province,shortName,names] of REGION_STATION_AREAS){
+      for(const name of names){
+        for(const alias of regionAliases(province,shortName,name)){
+          let score=0;
+          if(q===alias)score=30000+alias.length;
+          else if(alias.length>=2&&q.includes(alias))score=20000+alias.length;
+          else if(q.length>=2&&alias.includes(q))score=10000+q.length;
+          if(!score)continue;
+          const label=(name===province||name===shortName)?name:`${shortName} ${name}`;
+          const prev=byStation.get(station);
+          if(!prev||score>prev.score)byStation.set(station,{station,label,score,alias});
+        }
+      }
+    }
+    const found=[...byStation.values()].sort((a,b)=>b.score-a.score||Number(a.station)-Number(b.station));
+    if(!found.length)return {ok:false,reason:"not-found",candidates:[]};
+    const topScore=found[0].score;
+    const top=found.filter(x=>x.score===topScore);
+    if(top.length>1)return {ok:false,reason:"ambiguous",candidates:top.slice(0,5)};
+    return {ok:true,...found[0]};
+  }
+
   function validAsosStation(id){return Object.prototype.hasOwnProperty.call(ASOS_STATIONS,String(id||""));}
   function asosStationLabel(id){return validAsosStation(id)?`${ASOS_STATIONS[String(id)]} (${id})`:"관측지점 미설정";}
   function asosDateValid(date){
@@ -1142,7 +1285,7 @@
   }
   async function fetchWeather(date,stationId=state.project.stationId){
     const station=String(stationId||"");
-    if(!validAsosStation(station))throw new Error("설정에서 ASOS 관측지점을 먼저 선택해 주세요.");
+    if(!validAsosStation(station))throw new Error("설정에서 텃밭 지역(시·군·구)을 검색해 저장해 주세요.");
     if(!asosDateValid(date))throw new Error("조회 날짜를 확인해 주세요.");
     if(date>latestAsosDate())throw new Error("해당 날짜의 확정 일자료가 아직 없습니다. 관찰은 먼저 저장하세요. 다음날 오전 11시 이후 앱을 열면 자동으로 확정됩니다.");
     const params=new URLSearchParams({station,date});
@@ -1632,7 +1775,9 @@
     });
     document.getElementById("asosStation").value=validAsosStation(p.stationId)?String(p.stationId):"";
     const status=document.getElementById("placeSearchStatus");
-    status.textContent=validAsosStation(p.stationId)?`선택된 관측지점: ${asosStationLabel(p.stationId)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"텃밭과 가까운 ASOS 관측지점을 선택해 주세요. 기존 지역명과 기록은 그대로 유지됩니다.";
+    const savePlaceBtn=document.getElementById("savePlaceBtn");
+    savePlaceBtn.disabled=true;
+    status.textContent=validAsosStation(p.stationId)?`저장된 지역: ${p.gardenPlace||"지역명 없음"} · 날씨 관측은 ${asosStationLabel(p.stationId)}에 자동 연결됩니다.`:"시·군·구를 입력한 뒤 ‘지역 찾기’를 눌러 주세요.";
     status.className=validAsosStation(p.stationId)?"location-search-status ok":"location-search-status";
   }
 
@@ -1944,18 +2089,75 @@
   document.getElementById("footerPrivacyBtn").addEventListener("click",showPrivacy);
   document.getElementById("closePrivacyBtn").addEventListener("click",hidePrivacy);
   document.getElementById("privacyConfirmBtn").addEventListener("click",hidePrivacy);
-  document.getElementById("asosStation").replaceChildren(new Option("관측지점 선택",""),...Object.entries(ASOS_STATIONS).map(([id,name])=>new Option(`${name} (${id})`,id)));
-  document.getElementById("asosStation").addEventListener("change",e=>{
-    const status=document.getElementById("placeSearchStatus");
-    status.textContent=e.target.value?`선택된 관측지점: ${asosStationLabel(e.target.value)} · 텃밭 현장 측정값과 다를 수 있습니다.`:"관측지점을 선택해 주세요.";
-    status.className=e.target.value?"location-search-status ok":"location-search-status";
+  const gardenPlaceInput=document.getElementById("gardenPlace");
+  const asosStationInput=document.getElementById("asosStation");
+  const placeSearchStatus=document.getElementById("placeSearchStatus");
+  const savePlaceBtn=document.getElementById("savePlaceBtn");
+
+  function searchGardenRegion(){
+    const query=gardenPlaceInput.value.trim();
+    const result=findNearestStationByRegion(query);
+    asosStationInput.value="";
+    savePlaceBtn.disabled=true;
+    if(!result.ok){
+      if(result.reason==="short"){
+        placeSearchStatus.textContent="시·군·구를 2글자 이상 입력해 주세요.";
+      }else if(result.reason==="ambiguous"){
+        placeSearchStatus.textContent="같은 이름의 지역이 여러 곳에 있습니다. 시·도 이름까지 함께 입력해 주세요. 예: 서울 중구, 부산 중구, 경남 고성군.";
+      }else{
+        placeSearchStatus.textContent="지역을 찾지 못했습니다. 읍·면·동보다 시·군·구 단위로 입력해 주세요. 예: 충남 서산시.";
+      }
+      placeSearchStatus.className="location-search-status error";
+      return;
+    }
+    asosStationInput.value=result.station;
+    placeSearchStatus.textContent=`✅ ${result.label} 검색 완료 · 가까운 기상 관측은 ${asosStationLabel(result.station)}에 자동 연결됩니다. ‘지역 저장’을 눌러 확정하세요.`;
+    placeSearchStatus.className="location-search-status ok";
+    savePlaceBtn.disabled=false;
+  }
+
+  gardenPlaceInput.addEventListener("input",()=>{
+    const unchanged=gardenPlaceInput.value.trim()===String(state.project.gardenPlace||"").trim();
+    asosStationInput.value=unchanged&&validAsosStation(state.project.stationId)?String(state.project.stationId):"";
+    savePlaceBtn.disabled=true;
+    placeSearchStatus.textContent=unchanged&&validAsosStation(state.project.stationId)
+      ?`저장된 지역입니다. 날씨 관측은 ${asosStationLabel(state.project.stationId)}에 자동 연결됩니다.`
+      :"지역명이 변경되었습니다. ‘지역 찾기’를 눌러 가까운 관측지점을 다시 연결해 주세요.";
+    placeSearchStatus.className=unchanged&&validAsosStation(state.project.stationId)?"location-search-status ok":"location-search-status";
   });
+  gardenPlaceInput.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){e.preventDefault();searchGardenRegion();}
+  });
+  document.getElementById("findNearestStationBtn").addEventListener("click",searchGardenRegion);
+  savePlaceBtn.addEventListener("click",()=>{
+    const place=gardenPlaceInput.value.trim();
+    const station=asosStationInput.value;
+    if(!place||!validAsosStation(station)){
+      placeSearchStatus.textContent="먼저 시·군·구를 검색해 가까운 관측지점을 연결해 주세요.";
+      placeSearchStatus.className="location-search-status error";
+      return;
+    }
+    state.project.gardenPlace=place;
+    state.project.stationId=station;
+    state.project.locationConfirmed=true;
+    weatherRequestSerial++;
+    currentWeatherForObservation=null;
+    renderWeatherTo("ow",null);
+    saveState();
+    savePlaceBtn.disabled=true;
+    placeSearchStatus.textContent=`💾 지역 저장 완료 · ${place}의 날씨는 ${asosStationLabel(station)} 관측자료에 자동 연결됩니다.`;
+    placeSearchStatus.className="location-search-status ok";
+    toast("지역 설정을 저장했습니다.");
+    loadTodayWeather();
+  });
+
   document.getElementById("setupForm").addEventListener("submit",e=>{
     e.preventDefault();
-    const station=document.getElementById("asosStation").value;
+    const station=asosStationInput.value;
     if(!validAsosStation(station)){
-      document.getElementById("placeSearchStatus").textContent="ASOS 관측지점을 선택해 주세요.";
-      document.getElementById("asosStation").focus();return;
+      placeSearchStatus.textContent="텃밭 지역을 검색한 뒤 ‘지역 저장’을 눌러 주세요.";
+      placeSearchStatus.className="location-search-status error";
+      gardenPlaceInput.focus();return;
     }
     const ids=["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"];
     ids.forEach(id=>state.project[id]=document.getElementById(id).value);
@@ -2068,7 +2270,7 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=24", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=25", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
