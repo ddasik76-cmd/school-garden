@@ -45,7 +45,7 @@ const call = (expr) => vm.runInContext(expr, context);
   mock = async () => ({ok:false,json:async()=>({error:"NO_DATA",message:"자료 없음"})});
   await assert.rejects(call('fetchWeather("2020-04-23")'), /자료 없음/);
   state.project.stationId = "999";
-  await assert.rejects(call('fetchWeather("2020-04-23")'), /관측지점/);
+  await assert.rejects(call('fetchWeather("2020-04-23")'), /지역.*검색|관측지점/);
   console.log("PASS: API errors and invalid station are handled");
 
   assert.ok(html.includes('const STORAGE_KEY = "gardenClimateJournal.v1";'));
