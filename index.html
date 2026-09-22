@@ -1512,7 +1512,13 @@
         const observations=state.observations.slice();
         observations[index]={...original,weather,weatherStatus:"final"};
         const next={...state,observations};
-        verifiedCommit(next,{verify:data=>data.observations?.some(x=>x.id===original.id&&x.weatherStatus==="final")});
+        if(typeof verifiedCommit==="function"){
+          verifiedCommit(next,{verify:data=>data.observations?.some(x=>x.id===original.id&&x.weatherStatus==="final")});
+        }else{
+          localStorage.setItem(STORAGE_KEY,JSON.stringify(next));
+          state=next;
+          renderAll();
+        }
       }catch(error){
         // A failed request/write leaves the whole record untouched for the next visit.
         console.warn("기상자료 자동 확정을 다음 접속 때 다시 시도합니다.",error);
@@ -2036,7 +2042,7 @@
 
   async function saveObservation(e){
     e.preventDefault();
-    const submit=e.submitter||document.querySelector('#observationForm button[type="submit"]');
+    const submit=e.submitter||(document.querySelector?document.querySelector('#observationForm button[type="submit"]'):null);
     if(submit)submit.disabled=true;
     setStatus("obsStatus","기록을 기기에 저장하고 다시 확인하는 중입니다.","warn");
     try{
@@ -2068,7 +2074,10 @@
         updatedAt:new Date().toISOString()
       };
       const observations=editId?state.observations.map(x=>x.id===editId?obs:x):[...state.observations,obs];
-      verifiedCommit({...state,observations},{verify:data=>data.observations?.some(x=>x.id===id)});
+      const beforeTextSave=state;
+      state={...state,observations};
+      try{saveState({verify:data=>data.observations?.some(x=>x.id===id)});}
+      catch(error){state=beforeTextSave;throw error;}
       let photoSaved=!!keepPhotoId;
       if(selectedPhotoBlob){
         const newPhotoId=uid("photo");
@@ -2077,7 +2086,10 @@
           if(!await verifyPhotoSaved(newPhotoId))throw new Error("사진 저장 후 다시 읽지 못했습니다.");
           const attached={...obs,photoId:newPhotoId,updatedAt:new Date().toISOString()};
           const withPhoto=state.observations.map(x=>x.id===id?attached:x);
-          verifiedCommit({...state,observations:withPhoto},{verify:data=>data.observations?.some(x=>x.id===id&&x.photoId===newPhotoId)});
+          const beforePhotoAttach=state;
+          state={...state,observations:withPhoto};
+          try{saveState({verify:data=>data.observations?.some(x=>x.id===id&&x.photoId===newPhotoId)});}
+          catch(error){state=beforePhotoAttach;throw error;}
           photoSaved=true;
           if(oldPhotoId&&oldPhotoId!==newPhotoId){try{await photoDelete(oldPhotoId);}catch(error){console.warn("이전 사진 정리 실패",error);}}
           await requestPersistentStorage();
@@ -2088,13 +2100,13 @@
           document.getElementById("cancelEditBtn").classList.remove("hide");
           setStatus("obsStatus","✅ 관찰 내용은 저장되었습니다. ⚠️ 사진만 저장하지 못했습니다: "+storageErrorMessage(error),"warn");
           toast("✅ 내용 저장 완료 · 사진 저장 실패");
-          clearObservationDraft();
+          if(typeof clearObservationDraft==="function")clearObservationDraft();
           return;
         }
       }else if(removePhotoOnSave&&oldPhotoId){
         try{await photoDelete(oldPhotoId);}catch(error){console.warn("사진 삭제 실패",error);}
       }
-      clearObservationDraft();
+      if(typeof clearObservationDraft==="function")clearObservationDraft();
       resetObservationForm(false);
       const stamp=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
       setStatus("obsStatus",`✅ ${stamp} 저장 확인 완료 · 관찰 내용${photoSaved?" · 사진 저장 확인":""}`,"ok");
