@@ -365,7 +365,11 @@
       .timeline-item{grid-template-columns:1fr}
       .timeline-photo{aspect-ratio:4/3}
     }
-  </style>
+  /* v1.14.1 storage reliability follow-up */
+.backup-reminder{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 14px;padding:12px 14px;border:1px solid #e8d8a7;border-radius:16px;background:#fffaf0;color:#6f581b}
+.backup-reminder>div{display:grid;gap:3px}.backup-reminder strong{font-size:13px}.backup-reminder span{font-size:11px;line-height:1.5;color:#827143}.backup-reminder .btn{flex:0 0 auto}
+@media(max-width:640px){.backup-reminder{align-items:stretch;flex-direction:column}.backup-reminder .btn{width:100%}}
+</style>
 </head>
 <body>
 <div class="app-shell">
@@ -398,6 +402,10 @@
       </div>
 
       <div id="storageHealthBadge" class="storage-health-banner checking">🔎 이 기기의 저장 상태를 확인하는 중입니다.</div>
+      <div id="backupReminder" class="backup-reminder hide">
+        <div><strong>💾 ZIP 백업을 권장합니다.</strong><span id="backupReminderText">기록이 쌓였습니다. 기기 변경이나 브라우저 데이터 삭제에 대비해 백업해 주세요.</span></div>
+        <button class="btn small outline" id="backupReminderBtn" type="button">백업하러 가기</button>
+      </div>
 
       <div class="grid two">
         <div class="card">
@@ -628,6 +636,7 @@
         <div id="storageHealthDetails" class="storage-health-details">저장소를 점검하는 중입니다.</div>
         <div class="actions">
           <button class="btn small secondary" id="runStorageCheckBtn" type="button">🔎 다시 점검</button>
+          <button class="btn small outline" id="copyStorageCheckBtn" type="button">📋 진단 결과 복사</button>
         </div>
       </div>
       <div class="card" style="margin-top:12px">
@@ -829,7 +838,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.14.0";
+  const APP_VERSION = "1.14.1";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const LAST_SAVE_CHECK_KEY = "gardenClimateJournal.lastVerifiedSave";
@@ -1174,6 +1183,44 @@
         ["마지막 저장 검증",last],
         ["앱 버전",APP_VERSION]
       ].map(([k,v])=>`<div class="storage-health-item"><b>${k}</b><span>${esc(v)}</span></div>`).join("")+(storageHealth.lastError?`<div class="storage-health-item" style="grid-column:1/-1;border-color:#f0caca;background:#fff0f3"><b>최근 오류</b><span>${esc(storageHealth.lastError)}</span></div>`:"")+(loadStateError?`<div class="storage-health-item" style="grid-column:1/-1;border-color:#f0caca;background:#fff0f3"><b>기존 데이터 읽기 오류</b><span>기존 저장값을 보호하기 위해 새 데이터로 덮어쓰지 않습니다. ZIP 백업이 있다면 복원을 권장합니다.</span></div>`:"");
+    }
+  }
+
+  function storageDiagnosticText(){
+    const last=storageHealth.lastVerifiedAt?new Date(storageHealth.lastVerifiedAt).toLocaleString("ko-KR"):"아직 없음";
+    const textState=storageHealth.localStorage===true?"정상":storageHealth.localStorage===false?"오류":"확인 중";
+    const photoState=storageHealth.indexedDB===true?"정상":storageHealth.indexedDB===false?"오류":"확인 중";
+    const persistState=storageHealth.persisted===true?"허용됨":storageHealth.persisted===false?"보장되지 않음":"확인 불가";
+    return [
+      "텃밭 기후 탐구노트 · 저장 상태 진단",
+      "앱 버전: "+APP_VERSION,
+      "관찰 기록: "+state.observations.length+"개",
+      "성찰 기록: "+state.reflections.length+"개",
+      "사진 연결 기록: "+state.observations.filter(x=>x.photoId).length+"개",
+      "텍스트 저장(localStorage): "+textState,
+      "사진 저장(IndexedDB): "+photoState,
+      "장기 보관 요청: "+persistState,
+      "저장공간: "+(storageHealth.quota?bytesText(storageHealth.usage)+" / "+bytesText(storageHealth.quota):"확인 불가"),
+      "마지막 저장 검증: "+last,
+      "최근 오류: "+(storageHealth.lastError||"없음"),
+      "기존 데이터 읽기 오류: "+(loadStateError?"있음":"없음"),
+      "브라우저: "+navigator.userAgent
+    ].join("\n");
+  }
+
+  async function copyStorageDiagnostics(){
+    const text=storageDiagnosticText();
+    try{
+      if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);
+      else{
+        const ta=document.createElement("textarea");
+        ta.value=text;ta.style.position="fixed";ta.style.opacity="0";
+        document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();
+      }
+      toast("📋 저장 진단 결과를 복사했습니다.");
+    }catch(error){
+      console.error("진단 결과 복사 실패",error);
+      alert(text);
     }
   }
 
@@ -1919,8 +1966,15 @@
   }
 
   function renderBackupInfo(){
-    const ts=localStorage.getItem(LAST_BACKUP_KEY);
+    let ts="";
+    try{ts=localStorage.getItem(LAST_BACKUP_KEY)||"";}catch{}
     document.getElementById("backupInfo").textContent=ts?`마지막 ZIP 백업: ${new Date(ts).toLocaleString("ko-KR")}`:"아직 ZIP 백업 기록이 없습니다.";
+    const reminder=document.getElementById("backupReminder"),text=document.getElementById("backupReminderText");
+    if(!reminder||!text)return;
+    const lastTime=ts?new Date(ts).getTime():0,ageDays=lastTime?(Date.now()-lastTime)/(24*60*60*1000):Infinity;
+    const shouldShow=state.observations.length>=5&&(!lastTime||ageDays>=7);
+    reminder.classList.toggle("hide",!shouldShow);
+    if(shouldShow)text.textContent=!lastTime?`관찰 기록이 ${state.observations.length}개 쌓였습니다. 처음 ZIP 백업을 만들어 두세요.`:`마지막 ZIP 백업 후 ${Math.floor(ageDays)}일이 지났습니다. 최신 기록을 다시 백업해 주세요.`;
   }
 
   function renderAll(){
@@ -2126,10 +2180,15 @@
   async function deleteObservation(id){
     const o=state.observations.find(x=>x.id===id); if(!o) return;
     if(!confirm(`${o.date} 관찰 기록을 삭제할까요? 사진도 함께 삭제됩니다.`)) return;
-    if(o.photoId) await photoDelete(o.photoId);
-    state.observations=state.observations.filter(x=>x.id!==id);
-    saveState();
-    toast("관찰 기록을 삭제했습니다.");
+    try{
+      const next={...state,observations:state.observations.filter(x=>x.id!==id)};
+      verifiedCommit(next,{verify:data=>!data.observations?.some(x=>x.id===id)});
+      if(o.photoId){try{await photoDelete(o.photoId);}catch(error){console.warn("삭제된 기록의 사진 정리 실패",error);}}
+      toast("관찰 기록을 삭제했습니다.");
+    }catch(error){
+      console.error(error);
+      alert("관찰 기록을 삭제하지 못했습니다. 기존 기록은 그대로 유지됩니다.\n\n"+storageErrorMessage(error));
+    }
   }
 
   function saveReflection(e){
@@ -2162,9 +2221,13 @@
 
   function deleteReflection(id){
     if(!confirm("이 성찰 기록을 삭제할까요?")) return;
-    state.reflections=state.reflections.filter(x=>x.id!==id);
-    saveState();
-    toast("성찰 기록을 삭제했습니다.");
+    try{
+      verifiedCommit({...state,reflections:state.reflections.filter(x=>x.id!==id)},{verify:data=>!data.reflections?.some(x=>x.id===id)});
+      toast("성찰 기록을 삭제했습니다.");
+    }catch(error){
+      console.error(error);
+      alert("성찰 기록을 삭제하지 못했습니다. 기존 기록은 그대로 유지됩니다.\n\n"+storageErrorMessage(error));
+    }
   }
 
   async function backupZip(){
@@ -2250,8 +2313,7 @@
     const btn=document.getElementById("generatePdfBtn");
     const old=btn.textContent; btn.disabled=true; btn.textContent="A4 PDF 만드는 중…";
     try{
-      state.reportGenerated=true;
-      saveState();
+      verifiedCommit({...state,reportGenerated:true},{verify:data=>data.reportGenerated===true});
       await renderReportPreview();
       const preview=document.getElementById("reportPreview");
       await waitForReportImages(preview);
@@ -2369,18 +2431,23 @@
       placeSearchStatus.className="location-search-status error";
       return;
     }
-    state.project.gardenPlace=place;
-    state.project.stationId=station;
-    state.project.locationConfirmed=true;
-    weatherRequestSerial++;
-    currentWeatherForObservation=null;
-    renderWeatherTo("ow",null);
-    saveState();
-    savePlaceBtn.disabled=true;
-    placeSearchStatus.textContent=`💾 지역 저장 완료 · ${place}의 날씨는 ${asosStationLabel(station)} 관측자료에 자동 연결됩니다.`;
-    placeSearchStatus.className="location-search-status ok";
-    toast("지역 설정을 저장했습니다.");
-    loadTodayWeather();
+    try{
+      const project={...state.project,gardenPlace:place,stationId:station,locationConfirmed:true};
+      verifiedCommit({...state,project},{verify:data=>data.project?.gardenPlace===place&&String(data.project?.stationId)===String(station)});
+      weatherRequestSerial++;
+      currentWeatherForObservation=null;
+      renderWeatherTo("ow",null);
+      savePlaceBtn.disabled=true;
+      placeSearchStatus.textContent=`💾 지역 저장 확인 완료 · ${place}의 날씨는 ${asosStationLabel(station)} 관측자료에 자동 연결됩니다.`;
+      placeSearchStatus.className="location-search-status ok";
+      toast("✅ 지역 설정 저장 확인 완료");
+      loadTodayWeather();
+    }catch(error){
+      console.error(error);
+      placeSearchStatus.textContent="❌ 지역 설정을 저장하지 못했습니다. 입력값은 그대로 두었습니다.";
+      placeSearchStatus.className="location-search-status error";
+      alert("지역 설정을 저장하지 못했습니다.\n\n"+storageErrorMessage(error));
+    }
   });
 
   document.getElementById("setupForm").addEventListener("submit",e=>{
@@ -2392,14 +2459,21 @@
       gardenPlaceInput.focus();return;
     }
     const ids=["studentName","studentClass","cropName","variety","plantDate","gardenPlace","tempMin","tempMax","sunHours","rainWeekly","latitude","longitude","cropNotes"];
-    ids.forEach(id=>state.project[id]=document.getElementById(id).value);
-    state.project.stationId=station;
-    state.project.locationConfirmed=true;
-    weatherRequestSerial++;
-    currentWeatherForObservation=null;
-    renderWeatherTo("ow",null);
-    saveState();hideSetup();toast("프로젝트 설정을 저장했습니다.");
-    requestPersistentStorage();loadTodayWeather();
+    const project={...state.project};
+    ids.forEach(id=>project[id]=document.getElementById(id).value);
+    project.stationId=station;
+    project.locationConfirmed=true;
+    try{
+      verifiedCommit({...state,project},{verify:data=>data.project?.cropName===project.cropName&&String(data.project?.stationId)===String(station)});
+      weatherRequestSerial++;
+      currentWeatherForObservation=null;
+      renderWeatherTo("ow",null);
+      hideSetup();toast("✅ 프로젝트 설정 저장 확인 완료");
+      void requestPersistentStorage();loadTodayWeather();
+    }catch(error){
+      console.error(error);
+      alert("프로젝트 설정을 저장하지 못했습니다. 입력 내용은 그대로 두었습니다.\n\n"+storageErrorMessage(error));
+    }
   });
 
   async function handlePhotoSelection(file, sourceLabel){
@@ -2493,6 +2567,8 @@
   document.getElementById("printReportBtn").addEventListener("click",printReport);
   document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
   document.getElementById("runStorageCheckBtn").addEventListener("click",()=>runStorageDiagnostics({requestPersist:true,notify:true}));
+  document.getElementById("copyStorageCheckBtn").addEventListener("click",copyStorageDiagnostics);
+  document.getElementById("backupReminderBtn").addEventListener("click",()=>showPage("report"));
 
   const observationForm=document.getElementById("observationForm");
   const queueObservationDraft=()=>{
@@ -2524,7 +2600,7 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=26", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=27", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
