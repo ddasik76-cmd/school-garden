@@ -37,19 +37,21 @@ assert.ok(html.includes('id="savePlaceBtn"'));
 assert.ok(html.includes('<input id="asosStation" type="hidden">'));
 assert.ok(!html.includes('<select id="asosStation"'));
 assert.ok(!html.includes('replaceChildren(new Option("관측지점 선택"'));
-assert.ok(html.includes('state.project.gardenPlace=place;'));
-assert.ok(html.includes('state.project.stationId=station;'));
-assert.ok(html.includes('state.project.locationConfirmed=true;'));
+assert.ok(html.includes('const project={...state.project,gardenPlace:place,stationId:station,locationConfirmed:true};'));
+assert.ok(html.includes('verifiedCommit({...state,project}'));
+assert.ok(html.includes('지역 저장 확인 완료'));
 console.log("PASS: no manual station selector; explicit search + region save UI");
 
-assert.ok(html.includes('const APP_VERSION = "1.14.0";'));
-assert.ok(html.includes('service-worker.js?v=26'));
-assert.ok(sw.includes('const CACHE = "school-garden-v17";'));
+assert.ok(html.includes('const APP_VERSION = "1.14.1";'));
+assert.ok(html.includes('service-worker.js?v=27'));
+assert.ok(sw.includes('const CACHE = "school-garden-v18";'));
 assert.ok(html.includes('const STORAGE_KEY = "gardenClimateJournal.v1";'));
 assert.ok(html.includes('const DB_NAME = "gardenClimateJournalDB";'));
 assert.ok(html.includes('const PHOTO_STORE = "photos";'));
 assert.ok(html.includes('void syncPendingObservationWeather();'));
-console.log("PASS: cache/version bump and existing local data/weather-finalize contracts preserved");
+assert.ok(html.includes('copyStorageDiagnostics'));
+assert.ok(html.includes('id="backupReminder"'));
+console.log("PASS: cache/version bump, storage diagnostics and existing local data/weather-finalize contracts preserved");
 
 assert.ok(!html.includes('geocoding-api.open-meteo.com'));
 assert.ok(html.includes('GPS와 외부 지역검색 API는 사용하지 않습니다.'));
