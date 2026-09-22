@@ -167,6 +167,18 @@
     .photo-save-state.show{display:block}
     .photo-save-state.ok{background:#eaf8f2;color:#24705b}
     .photo-save-state.error{background:#fff0f3;color:#a43e58}
+    .storage-health-banner{margin:12px 0 14px;padding:10px 13px;border:1px solid #d9dde5;border-radius:13px;background:#f7f8fb;color:#596273;font-size:12px;font-weight:800}
+    .storage-health-banner.ok{border-color:#c9eadc;background:#eef9f4;color:#24705b}
+    .storage-health-banner.warn{border-color:#f0dfb5;background:#fff9e9;color:#8a651b}
+    .storage-health-banner.error{border-color:#f0caca;background:#fff0f3;color:#a43e58}
+    .storage-diagnostic-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .storage-diagnostic-head h3{margin:0 0 4px}.storage-diagnostic-head p{margin:0}
+    .storage-chip{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:#eef0f4;color:#69717c;font-size:11px;font-weight:900}
+    .storage-chip.ok{background:#eaf8f2;color:#24705b}.storage-chip.warn{background:#fff4d8;color:#8a651b}.storage-chip.error{background:#ffe9ee;color:#a43e58}
+    .storage-health-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}
+    .storage-health-item{padding:10px 11px;border:1px solid #e8eaf0;border-radius:11px;background:#fafbfc;font-size:12px}
+    .storage-health-item b{display:block;margin-bottom:3px}.storage-health-item span{color:#6b7280}
+    @media(max-width:640px){.storage-health-details{grid-template-columns:1fr}.storage-diagnostic-head{align-items:flex-start;flex-direction:column}}
     .privacy-card{background:linear-gradient(135deg,#f2efff,#edf9f5);border:1px solid #dddaf6;border-radius:20px;padding:16px}
     .privacy-list{margin:8px 0 0;padding-left:19px;color:var(--muted);font-size:13px}
     .privacy-list li{margin:6px 0}
@@ -384,6 +396,8 @@
           <div class="hero-stat"><strong id="statPoints">0</strong><span>새싹 포인트</span></div>
         </div>
       </div>
+
+      <div id="storageHealthBadge" class="storage-health-banner checking">🔎 이 기기의 저장 상태를 확인하는 중입니다.</div>
 
       <div class="grid two">
         <div class="card">
@@ -606,7 +620,17 @@
       </div>
 
       <div class="section-title"><div><h2>데이터 관리</h2></div></div>
-      <div class="card">
+      <div class="card storage-diagnostic">
+        <div class="storage-diagnostic-head">
+          <div><h3>기기 저장 상태 점검</h3><p class="subtle">학생 기록이 실제로 저장될 수 있는 환경인지 확인합니다.</p></div>
+          <span id="storageHealthChip" class="storage-chip checking">확인 중</span>
+        </div>
+        <div id="storageHealthDetails" class="storage-health-details">저장소를 점검하는 중입니다.</div>
+        <div class="actions">
+          <button class="btn small secondary" id="runStorageCheckBtn" type="button">🔎 다시 점검</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
         <div class="privacy-card">
           <strong>🔒 개인정보·사진은 이렇게 다룹니다</strong>
           <div style="margin-top:8px">
@@ -805,9 +829,12 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.13.0";
+  const APP_VERSION = "1.14.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
+  const LAST_SAVE_CHECK_KEY = "gardenClimateJournal.lastVerifiedSave";
+  const OBS_DRAFT_KEY = "gardenClimateJournal.observationDraft.v1";
+  const STORAGE_TEST_KEY = "gardenClimateJournal.storageTest";
   const DB_NAME = "gardenClimateJournalDB";
   const DB_VERSION = 1;
   const PHOTO_STORE = "photos";
@@ -844,6 +871,11 @@
     {min:500, max:99999, name:"텃밭 연구자", emoji:"🍅", desc:"한 학기의 탐구를 스스로 정리할 수 있어요."}
   ];
 
+  let loadStateError = null;
+  let loadStateRaw = "";
+  let externalStorageChanged = false;
+  let storageHealth = {localStorage:null,indexedDB:null,persisted:null,usage:null,quota:null,lastVerifiedAt:localStorage.getItem(LAST_SAVE_CHECK_KEY)||"",lastError:""};
+  let observationDraftTimer = null;
   let state = loadState();
   let dbPromise = openDB();
   let selectedPhotoBlob = null;
@@ -883,11 +915,11 @@
   function loadState(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
+      loadStateRaw=raw||"";
+      loadStateError=null;
       if(!raw) return defaultState();
       const parsed = JSON.parse(raw);
       const mergedProject=Object.assign(defaultState().project, parsed.project||{});
-      // v1.3까지 앱에 들어 있던 서산 기본값은 새 버전에서 자동 위치로 간주하지 않습니다.
-      // 사용자가 직접 지역을 검색·확정하도록 하여 전국 어디서나 동일하게 사용합니다.
       if(!mergedProject.locationConfirmed && mergedProject.gardenPlace==="충남 서산시" && Number(mergedProject.latitude)===36.7845 && Number(mergedProject.longitude)===126.4503){
         mergedProject.gardenPlace=""; mergedProject.latitude=null; mergedProject.longitude=null;
       }
@@ -897,15 +929,75 @@
         reflections:Array.isArray(parsed.reflections)?parsed.reflections:[]
       });
     }catch(e){
-      console.error(e);
+      console.error("저장 데이터 읽기 실패",e);
+      loadStateError=e;
+      try{loadStateRaw=localStorage.getItem(STORAGE_KEY)||"";}catch{}
       return defaultState();
     }
   }
 
-  function saveState(){
-    state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    renderAll();
+  function storageErrorMessage(error){
+    const name=error?.name||"";
+    if(name==="QuotaExceededError")return "브라우저 저장공간이 부족합니다. 사진·사이트 데이터를 정리하거나 ZIP 백업 후 다시 시도해 주세요.";
+    if(name==="SecurityError")return "이 브라우저에서 사이트 저장공간 사용이 차단되어 있습니다. 일반 Chrome 창에서 다시 열어 주세요.";
+    return error?.message||"기기 저장소에 기록하지 못했습니다.";
+  }
+
+  function storedState(){
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return null;
+    return JSON.parse(raw);
+  }
+
+  function verifiedCommit(nextState,{verify=null,render=true,allowConflict=false}={}){
+    if(loadStateError && localStorage.getItem(STORAGE_KEY)===loadStateRaw){
+      throw new Error("기존 저장 데이터를 읽지 못한 상태라 새 데이터로 덮어쓰지 않았습니다. 보고서의 ‘저장 상태 점검’을 확인해 주세요.");
+    }
+    if(!allowConflict){
+      try{
+        const stored=storedState();
+        if(stored?.updatedAt && state?.updatedAt && new Date(stored.updatedAt).getTime()>new Date(state.updatedAt).getTime()){
+          externalStorageChanged=true;
+          throw new Error("다른 탭에서 더 최신 기록이 저장되었습니다. 현재 입력 내용은 그대로 두고, 페이지를 새로고침한 뒤 다시 저장해 주세요.");
+        }
+      }catch(error){
+        if(error?.message?.includes("다른 탭"))throw error;
+        if(error instanceof SyntaxError)throw new Error("저장된 데이터를 다시 읽지 못해 덮어쓰기를 중단했습니다.");
+      }
+    }
+    const next={...nextState,updatedAt:new Date().toISOString()};
+    const serialized=JSON.stringify(next);
+    try{
+      localStorage.setItem(STORAGE_KEY,serialized);
+      const raw=localStorage.getItem(STORAGE_KEY);
+      if(!raw)throw new Error("저장 후 데이터를 다시 읽지 못했습니다.");
+      const checked=JSON.parse(raw);
+      if(verify && !verify(checked))throw new Error("저장 후 확인 과정에서 방금 기록을 찾지 못했습니다.");
+      state=next;
+      const checkedAt=new Date().toISOString();
+      localStorage.setItem(LAST_SAVE_CHECK_KEY,checkedAt);
+      storageHealth.localStorage=true;
+      storageHealth.lastVerifiedAt=checkedAt;
+      storageHealth.lastError="";
+      externalStorageChanged=false;
+      if(render)renderAll();
+      renderStorageHealth();
+      return checked;
+    }catch(error){
+      storageHealth.localStorage=false;
+      storageHealth.lastError=storageErrorMessage(error);
+      renderStorageHealth();
+      throw error;
+    }
+  }
+
+  function saveState(options={}){
+    try{return verifiedCommit(state,options);}
+    catch(error){
+      console.error("저장 실패",error);
+      toast("❌ 저장 실패 · 작성 내용은 화면에 그대로 두었습니다.");
+      throw error;
+    }
   }
 
   function num(v){
@@ -1050,6 +1142,71 @@
   async function verifyPhotoSaved(id){
     const saved=await photoGet(id);
     return !!(saved && saved.size>0);
+  }
+
+  function bytesText(v){
+    if(!Number.isFinite(v))return "-";
+    if(v<1024*1024)return (v/1024).toFixed(0)+"KB";
+    return (v/1024/1024).toFixed(v<100*1024*1024?1:0)+"MB";
+  }
+
+  function renderStorageHealth(){
+    const badge=document.getElementById("storageHealthBadge"),chip=document.getElementById("storageHealthChip"),details=document.getElementById("storageHealthDetails");
+    const hardError=!!loadStateError||storageHealth.localStorage===false||storageHealth.indexedDB===false;
+    const warning=!hardError && storageHealth.persisted===false;
+    const cls=hardError?"error":warning?"warn":storageHealth.localStorage===true&&storageHealth.indexedDB===true?"ok":"checking";
+    const label=hardError?"저장 문제":warning?"주의":cls==="ok"?"정상":"확인 중";
+    const summary=hardError?"❌ 이 기기에서 저장 문제가 확인되었습니다. 기록 저장 전 아래 점검 결과를 확인하세요.":warning?"⚠️ 저장은 가능하지만 브라우저가 장기 보관을 보장하지 않습니다. 같은 Chrome 프로필을 사용하고 주기적으로 ZIP 백업하세요.":cls==="ok"?"✅ 이 기기의 텍스트·사진 저장소가 정상 작동합니다.":"🔎 이 기기의 저장 상태를 확인하는 중입니다.";
+    if(badge){badge.className="storage-health-banner "+cls;badge.textContent=summary;}
+    if(chip){chip.className="storage-chip "+cls;chip.textContent=label;}
+    if(details){
+      const last=storageHealth.lastVerifiedAt?new Date(storageHealth.lastVerifiedAt).toLocaleString("ko-KR"):"아직 없음";
+      details.innerHTML=[
+        ["텍스트 저장(localStorage)",storageHealth.localStorage===true?"정상":storageHealth.localStorage===false?"오류":"확인 중"],
+        ["사진 저장(IndexedDB)",storageHealth.indexedDB===true?"정상":storageHealth.indexedDB===false?"오류":"확인 중"],
+        ["장기 보관 요청",storageHealth.persisted===true?"허용됨":storageHealth.persisted===false?"보장되지 않음":"확인 불가"],
+        ["저장공간",storageHealth.quota?bytesText(storageHealth.usage)+" / "+bytesText(storageHealth.quota):"확인 불가"],
+        ["마지막 저장 검증",last],
+        ["앱 버전",APP_VERSION]
+      ].map(([k,v])=>`<div class="storage-health-item"><b>${k}</b><span>${esc(v)}</span></div>`).join("")+(storageHealth.lastError?`<div class="storage-health-item" style="grid-column:1/-1;border-color:#f0caca;background:#fff0f3"><b>최근 오류</b><span>${esc(storageHealth.lastError)}</span></div>`:"")+(loadStateError?`<div class="storage-health-item" style="grid-column:1/-1;border-color:#f0caca;background:#fff0f3"><b>기존 데이터 읽기 오류</b><span>기존 저장값을 보호하기 위해 새 데이터로 덮어쓰지 않습니다. ZIP 백업이 있다면 복원을 권장합니다.</span></div>`:"");
+    }
+  }
+
+  async function runStorageDiagnostics({requestPersist=false,notify=false}={}){
+    storageHealth.lastError="";
+    try{
+      const token=uid("storage");
+      localStorage.setItem(STORAGE_TEST_KEY,token);
+      if(localStorage.getItem(STORAGE_TEST_KEY)!==token)throw new Error("localStorage 재확인 실패");
+      localStorage.removeItem(STORAGE_TEST_KEY);
+      storageHealth.localStorage=true;
+    }catch(error){
+      storageHealth.localStorage=false;
+      storageHealth.lastError=storageErrorMessage(error);
+    }
+    try{
+      const id="__storage_diag__";
+      const blob=new Blob(["garden-storage-test"],{type:"text/plain"});
+      await photoPut(id,blob);
+      storageHealth.indexedDB=await verifyPhotoSaved(id);
+      await photoDelete(id);
+      if(!storageHealth.indexedDB)throw new Error("IndexedDB 재확인 실패");
+    }catch(error){
+      storageHealth.indexedDB=false;
+      storageHealth.lastError=storageHealth.lastError||storageErrorMessage(error);
+    }
+    try{
+      if(requestPersist && navigator.storage?.persist)await navigator.storage.persist();
+      storageHealth.persisted=navigator.storage?.persisted?await navigator.storage.persisted():null;
+      if(navigator.storage?.estimate){
+        const estimate=await navigator.storage.estimate();
+        storageHealth.usage=Number(estimate.usage)||0;
+        storageHealth.quota=Number(estimate.quota)||0;
+      }
+    }catch(error){console.warn("storage diagnostics",error);}
+    renderStorageHealth();
+    if(notify)toast(storageHealth.localStorage&&storageHealth.indexedDB?"✅ 저장소 점검 완료":"❌ 저장소에 문제가 있습니다.");
+    return storageHealth;
   }
 
   async function blobURL(id){
@@ -1350,10 +1507,7 @@
         const observations=state.observations.slice();
         observations[index]={...original,weather,weatherStatus:"final"};
         const next={...state,observations};
-        // Commit in memory only after durable storage succeeds; leave pending on failure.
-        localStorage.setItem(STORAGE_KEY,JSON.stringify(next));
-        state=next;
-        renderAll();
+        verifiedCommit(next,{verify:data=>data.observations?.some(x=>x.id===original.id&&x.weatherStatus==="final")});
       }catch(error){
         // A failed request/write leaves the whole record untouched for the next visit.
         console.warn("기상자료 자동 확정을 다음 접속 때 다시 시도합니다.",error);
@@ -1765,6 +1919,7 @@
     renderGrowth();
     renderReportPreview();
     renderBackupInfo();
+    renderStorageHealth();
   }
 
   function fillSetup(){
@@ -1790,7 +1945,37 @@
     document.getElementById("setupModal").classList.remove("show");
   }
 
-  function resetObservationForm(){
+  const OBS_DRAFT_FIELDS=["obsDate","heightCm","leafCount","flowerCount","fruitCount","soilState","watered","pest","changeKeyword","obsNote","weatherThought"];
+  function observationDraftData(){
+    const values={};
+    OBS_DRAFT_FIELDS.forEach(id=>{const el=document.getElementById(id);if(el)values[id]=el.value;});
+    return {savedAt:new Date().toISOString(),editId:document.getElementById("obsId")?.value||"",values};
+  }
+  function draftHasContent(draft){
+    const v=draft?.values||{};
+    return ["heightCm","leafCount","flowerCount","fruitCount","soilState","watered","pest","changeKeyword","obsNote","weatherThought"].some(id=>String(v[id]||"").trim()!=="");
+  }
+  function saveObservationDraft(){
+    try{
+      const draft=observationDraftData();
+      if(draftHasContent(draft))localStorage.setItem(OBS_DRAFT_KEY,JSON.stringify(draft));
+      else localStorage.removeItem(OBS_DRAFT_KEY);
+    }catch(error){console.warn("관찰 임시저장 실패",error);}
+  }
+  function clearObservationDraft(){try{localStorage.removeItem(OBS_DRAFT_KEY);}catch{}}
+  function restoreObservationDraft(){
+    try{
+      const raw=localStorage.getItem(OBS_DRAFT_KEY);if(!raw)return;
+      const draft=JSON.parse(raw),age=Date.now()-new Date(draft.savedAt).getTime();
+      if(!draftHasContent(draft)||!Number.isFinite(age)||age>7*24*60*60*1000){clearObservationDraft();return;}
+      document.getElementById("obsId").value=draft.editId||"";
+      OBS_DRAFT_FIELDS.forEach(id=>{const el=document.getElementById(id);if(el&&draft.values?.[id]!==undefined)el.value=draft.values[id];});
+      if(draft.editId)document.getElementById("cancelEditBtn").classList.remove("hide");
+      setStatus("obsStatus","📝 이전에 작성 중이던 관찰 내용을 복원했습니다. 사진은 임시저장되지 않으니 다시 확인해 주세요.","warn");
+    }catch(error){console.warn("관찰 임시기록 복원 실패",error);}
+  }
+
+  function resetObservationForm(clearDraft=true){
     weatherRequestSerial++;
     document.getElementById("observationForm").reset();
     document.getElementById("obsId").value="";
@@ -1803,6 +1988,7 @@
     const photoState=document.getElementById("photoSaveState"); photoState.className="photo-save-state"; photoState.textContent="";
     selectedPhotoBlob=null;
     removePhotoOnSave=false;
+    if(clearDraft)clearObservationDraft();
     currentWeatherForObservation=null;
     renderWeatherTo("ow",null);
     document.getElementById("cancelEditBtn").classList.add("hide");
@@ -1844,33 +2030,22 @@
 
   async function saveObservation(e){
     e.preventDefault();
+    const submit=e.submitter||document.querySelector('#observationForm button[type="submit"]');
+    if(submit)submit.disabled=true;
+    setStatus("obsStatus","기록을 기기에 저장하고 다시 확인하는 중입니다.","warn");
     try{
       const editId=document.getElementById("obsId").value;
       const old=editId?state.observations.find(x=>x.id===editId):null;
       const id=editId||uid("obs");
-      let photoId=old?.photoId||"";
-
-      if(removePhotoOnSave && old?.photoId && !selectedPhotoBlob){
-        await photoDelete(old.photoId);
-        photoId="";
-      }
-
-      if(selectedPhotoBlob){
-        photoId=photoId||uid("photo");
-        await photoPut(photoId,selectedPhotoBlob);
-        const ok=await verifyPhotoSaved(photoId);
-        if(!ok) throw new Error("사진이 기기에 저장되었는지 확인하지 못했습니다.");
-        await requestPersistentStorage();
-      }
-
       const date=document.getElementById("obsDate").value;
-      // Re-read after photo storage awaits: a background sync may have finalized this record.
       const latest=editId?state.observations.find(x=>x.id===editId):null;
       const weatherFields=observationWeatherFields(date,latest,currentWeatherForObservation);
+      const oldPhotoId=old?.photoId||"";
+      const keepPhotoId=(removePhotoOnSave&&!selectedPhotoBlob)?"":oldPhotoId;
       const obs={
         ...latest,
         id,
-        date:document.getElementById("obsDate").value,
+        date,
         heightCm:document.getElementById("heightCm").value,
         leafCount:document.getElementById("leafCount").value,
         flowerCount:document.getElementById("flowerCount").value,
@@ -1882,21 +2057,51 @@
         note:document.getElementById("obsNote").value.trim(),
         weatherThought:document.getElementById("weatherThought").value.trim(),
         ...weatherFields,
-        photoId,
+        photoId:keepPhotoId,
         createdAt:old?.createdAt||new Date().toISOString(),
         updatedAt:new Date().toISOString()
       };
-      if(editId) state.observations=state.observations.map(x=>x.id===editId?obs:x);
-      else state.observations.push(obs);
-      saveState();
-      resetObservationForm();
-      setStatus("obsStatus", editId?"관찰 기록을 수정했습니다.":"관찰 기록을 저장했습니다. 사진도 기기 저장소에서 확인했습니다.","ok");
-      toast(editId?"수정 완료":"🌱 관찰 + 사진 저장 완료");
+      const observations=editId?state.observations.map(x=>x.id===editId?obs:x):[...state.observations,obs];
+      verifiedCommit({...state,observations},{verify:data=>data.observations?.some(x=>x.id===id)});
+      let photoSaved=!selectedPhotoBlob;
+      if(selectedPhotoBlob){
+        const newPhotoId=uid("photo");
+        try{
+          await photoPut(newPhotoId,selectedPhotoBlob);
+          if(!await verifyPhotoSaved(newPhotoId))throw new Error("사진 저장 후 다시 읽지 못했습니다.");
+          const attached={...obs,photoId:newPhotoId,updatedAt:new Date().toISOString()};
+          const withPhoto=state.observations.map(x=>x.id===id?attached:x);
+          verifiedCommit({...state,observations:withPhoto},{verify:data=>data.observations?.some(x=>x.id===id&&x.photoId===newPhotoId)});
+          photoSaved=true;
+          if(oldPhotoId&&oldPhotoId!==newPhotoId){try{await photoDelete(oldPhotoId);}catch(error){console.warn("이전 사진 정리 실패",error);}}
+          await requestPersistentStorage();
+        }catch(error){
+          console.error("사진 저장 실패",error);
+          try{await photoDelete(newPhotoId);}catch{}
+          document.getElementById("obsId").value=id;
+          document.getElementById("cancelEditBtn").classList.remove("hide");
+          setStatus("obsStatus","✅ 관찰 내용은 저장되었습니다. ⚠️ 사진만 저장하지 못했습니다: "+storageErrorMessage(error),"warn");
+          toast("✅ 내용 저장 완료 · 사진 저장 실패");
+          clearObservationDraft();
+          return;
+        }
+      }else if(removePhotoOnSave&&oldPhotoId){
+        try{await photoDelete(oldPhotoId);}catch(error){console.warn("사진 삭제 실패",error);}
+      }
+      clearObservationDraft();
+      resetObservationForm(false);
+      const stamp=new Date().toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"});
+      setStatus("obsStatus",`✅ ${stamp} 저장 확인 완료 · 관찰 내용${photoSaved?" · 사진 저장 확인":""}`,"ok");
+      toast(editId?"✅ 수정 저장 확인 완료":"🌱 관찰 기록 저장 확인 완료");
       void syncPendingObservationWeather();
     }catch(err){
       console.error(err);
-      setStatus("obsStatus",`저장하지 못했습니다: ${err.message || "알 수 없는 오류"}`,"error");
-      alert("관찰 기록을 저장하는 중 문제가 생겼습니다.\n\n"+(err.message||""));
+      storageHealth.lastError=storageErrorMessage(err);
+      renderStorageHealth();
+      setStatus("obsStatus",`❌ 저장하지 못했습니다. 작성 내용은 지우지 않았습니다: ${storageErrorMessage(err)}`,"error");
+      alert("관찰 기록을 저장하지 못했습니다.\n작성 내용은 화면에 그대로 남아 있습니다.\n\n"+storageErrorMessage(err));
+    }finally{
+      if(submit)submit.disabled=false;
     }
   }
 
@@ -1925,11 +2130,16 @@
     if(!r.observe && !r.evidence && !r.infer && !r.next && !r.climate){
       toast("성찰 내용을 한 가지 이상 작성해 주세요."); return;
     }
-    state.reflections.push(r);
-    saveState();
-    document.getElementById("reflectionForm").reset();
-    document.getElementById("reflectDate").value=todayStr();
-    toast("🧠 성찰 저장 +20P");
+    try{
+      verifiedCommit({...state,reflections:[...state.reflections,r]},{verify:data=>data.reflections?.some(x=>x.id===r.id)});
+      document.getElementById("reflectionForm").reset();
+      document.getElementById("reflectDate").value=todayStr();
+      toast("🧠 성찰 저장 확인 완료 +20P");
+    }catch(error){
+      console.error(error);
+      toast("❌ 성찰을 저장하지 못했습니다. 작성 내용은 그대로 두었습니다.");
+      alert("성찰 기록을 저장하지 못했습니다.\n\n"+storageErrorMessage(error));
+    }
   }
 
   function deleteReflection(id){
@@ -1988,8 +2198,9 @@
         await photoPut(id,blob);
       }
       state=Object.assign(defaultState(),payload.state,{project:Object.assign(defaultState().project,payload.state.project||{})});
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
-      renderAll();
+      loadStateError=null;loadStateRaw="";externalStorageChanged=false;
+      verifiedCommit(state,{allowConflict:true,verify:data=>Array.isArray(data.observations)&&Array.isArray(data.reflections)});
+      clearObservationDraft();
       fillSetup();
       toast(`복원 완료: 사진 ${entries.length}장`);
     }catch(err){
@@ -2072,6 +2283,9 @@
     await photoClear();
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(LAST_BACKUP_KEY);
+    localStorage.removeItem(LAST_SAVE_CHECK_KEY);
+    clearObservationDraft();
+    loadStateError=null;loadStateRaw="";externalStorageChanged=false;
     state=defaultState();
     saveState();
     resetObservationForm();
@@ -2260,6 +2474,28 @@
   document.getElementById("generatePdfBtn").addEventListener("click",generatePDF);
   document.getElementById("printReportBtn").addEventListener("click",printReport);
   document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
+  document.getElementById("runStorageCheckBtn").addEventListener("click",()=>runStorageDiagnostics({requestPersist:true,notify:true}));
+
+  const observationForm=document.getElementById("observationForm");
+  const queueObservationDraft=()=>{
+    clearTimeout(observationDraftTimer);
+    observationDraftTimer=setTimeout(saveObservationDraft,650);
+  };
+  observationForm.addEventListener("input",e=>{if(e.target.type!=="file")queueObservationDraft();});
+  observationForm.addEventListener("change",e=>{if(e.target.type!=="file")queueObservationDraft();});
+
+  window.addEventListener("storage",e=>{
+    if(e.key!==STORAGE_KEY||!e.newValue)return;
+    try{
+      const incoming=JSON.parse(e.newValue);
+      if(incoming?.updatedAt&&state?.updatedAt&&new Date(incoming.updatedAt).getTime()>new Date(state.updatedAt).getTime()){
+        externalStorageChanged=true;
+        storageHealth.lastError="다른 탭에서 더 최신 데이터가 저장되었습니다. 이 탭에서 저장하기 전에 새로고침해 주세요.";
+        renderStorageHealth();
+        toast("⚠️ 다른 탭에서 기록이 변경되었습니다.");
+      }
+    }catch{}
+  });
 
   document.addEventListener("visibilitychange",()=>{
     if(document.visibilityState==="visible")void syncPendingObservationWeather();
@@ -2270,10 +2506,17 @@
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=25", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=26", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
+  restoreObservationDraft();
+  if(loadStateError){
+    storageHealth.lastError="기존 저장 데이터를 읽지 못했습니다. 기존 값을 보호하기 위해 새 기록으로 덮어쓰지 않습니다.";
+    renderStorageHealth();
+    setTimeout(()=>alert("⚠️ 이 기기의 기존 텃밭 기록을 읽지 못했습니다.\n기존 데이터를 보호하기 위해 새 저장을 막아 두었습니다.\n보고서 → 데이터 관리 → 저장 상태 점검을 확인해 주세요."),150);
+  }
+  void runStorageDiagnostics({requestPersist:false,notify:false});
   if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);
   else loadTodayWeather();
   void syncPendingObservationWeather();
