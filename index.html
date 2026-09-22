@@ -874,7 +874,7 @@
   let loadStateError = null;
   let loadStateRaw = "";
   let externalStorageChanged = false;
-  let storageHealth = {localStorage:null,indexedDB:null,persisted:null,usage:null,quota:null,lastVerifiedAt:localStorage.getItem(LAST_SAVE_CHECK_KEY)||"",lastError:""};
+  let storageHealth = {localStorage:null,indexedDB:null,persisted:null,usage:null,quota:null,lastVerifiedAt:(()=>{try{return localStorage.getItem(LAST_SAVE_CHECK_KEY)||""}catch{return ""}})(),lastError:""};
   let observationDraftTimer = null;
   let state = loadState();
   let dbPromise = openDB();
@@ -950,7 +950,7 @@
   }
 
   function verifiedCommit(nextState,{verify=null,render=true,allowConflict=false}={}){
-    if(loadStateError && localStorage.getItem(STORAGE_KEY)===loadStateRaw){
+    if(loadStateError){
       throw new Error("기존 저장 데이터를 읽지 못한 상태라 새 데이터로 덮어쓰지 않았습니다. 보고서의 ‘저장 상태 점검’을 확인해 주세요.");
     }
     if(!allowConflict){
@@ -967,34 +967,39 @@
     }
     const next={...nextState,updatedAt:new Date().toISOString()};
     const serialized=JSON.stringify(next);
+    let checked;
     try{
       localStorage.setItem(STORAGE_KEY,serialized);
       const raw=localStorage.getItem(STORAGE_KEY);
       if(!raw)throw new Error("저장 후 데이터를 다시 읽지 못했습니다.");
-      const checked=JSON.parse(raw);
+      checked=JSON.parse(raw);
       if(verify && !verify(checked))throw new Error("저장 후 확인 과정에서 방금 기록을 찾지 못했습니다.");
-      state=next;
-      const checkedAt=new Date().toISOString();
-      localStorage.setItem(LAST_SAVE_CHECK_KEY,checkedAt);
-      storageHealth.localStorage=true;
-      storageHealth.lastVerifiedAt=checkedAt;
-      storageHealth.lastError="";
-      externalStorageChanged=false;
-      if(render)renderAll();
-      renderStorageHealth();
-      return checked;
     }catch(error){
       storageHealth.localStorage=false;
       storageHealth.lastError=storageErrorMessage(error);
       renderStorageHealth();
       throw error;
     }
+    state=next;
+    const checkedAt=new Date().toISOString();
+    try{localStorage.setItem(LAST_SAVE_CHECK_KEY,checkedAt);}catch(error){console.warn("마지막 검증시각 저장 실패",error);}
+    storageHealth.localStorage=true;
+    storageHealth.lastVerifiedAt=checkedAt;
+    storageHealth.lastError="";
+    externalStorageChanged=false;
+    if(render){
+      try{renderAll();}catch(error){console.error("저장 후 화면 갱신 오류",error);}
+    }
+    renderStorageHealth();
+    return checked;
   }
 
   function saveState(options={}){
     try{return verifiedCommit(state,options);}
     catch(error){
       console.error("저장 실패",error);
+      storageHealth.lastError=storageErrorMessage(error);
+      renderStorageHealth();
       toast("❌ 저장 실패 · 작성 내용은 화면에 그대로 두었습니다.");
       throw error;
     }
@@ -1968,9 +1973,10 @@
       const raw=localStorage.getItem(OBS_DRAFT_KEY);if(!raw)return;
       const draft=JSON.parse(raw),age=Date.now()-new Date(draft.savedAt).getTime();
       if(!draftHasContent(draft)||!Number.isFinite(age)||age>7*24*60*60*1000){clearObservationDraft();return;}
-      document.getElementById("obsId").value=draft.editId||"";
+      const validEditId=draft.editId&&state.observations.some(x=>x.id===draft.editId)?draft.editId:"";
+      document.getElementById("obsId").value=validEditId;
       OBS_DRAFT_FIELDS.forEach(id=>{const el=document.getElementById(id);if(el&&draft.values?.[id]!==undefined)el.value=draft.values[id];});
-      if(draft.editId)document.getElementById("cancelEditBtn").classList.remove("hide");
+      if(validEditId)document.getElementById("cancelEditBtn").classList.remove("hide");
       setStatus("obsStatus","📝 이전에 작성 중이던 관찰 내용을 복원했습니다. 사진은 임시저장되지 않으니 다시 확인해 주세요.","warn");
     }catch(error){console.warn("관찰 임시기록 복원 실패",error);}
   }
@@ -2063,7 +2069,7 @@
       };
       const observations=editId?state.observations.map(x=>x.id===editId?obs:x):[...state.observations,obs];
       verifiedCommit({...state,observations},{verify:data=>data.observations?.some(x=>x.id===id)});
-      let photoSaved=!selectedPhotoBlob;
+      let photoSaved=!!keepPhotoId;
       if(selectedPhotoBlob){
         const newPhotoId=uid("photo");
         try{
