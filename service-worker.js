@@ -1,4 +1,4 @@
-const CACHE = "school-garden-v18";
+const CACHE = "school-garden-v19";
 const BASE = new URL("./", self.location.href).pathname;
 const CORE = [BASE, BASE + "index.html", BASE + "manifest.webmanifest", BASE + "mobile-fixes.css?v=22"];
 

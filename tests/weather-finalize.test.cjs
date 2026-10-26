@@ -110,7 +110,7 @@ test('exact timeline text, startup and foreground hooks, storage/photo/ZIP contr
   assert.equal(h.context.observationWeatherStatusText({weather:{mean:20}}),'');
   assert.match(html,/visibilitychange[\s\S]*?visibilityState==="visible"\)void syncPendingObservationWeather/);
   assert.match(html,/else loadTodayWeather\(\);\s+void syncPendingObservationWeather\(\);/);
-  for(const text of ['const STORAGE_KEY = "gardenClimateJournal.v1";','const DB_NAME = "gardenClimateJournalDB";','const DB_VERSION = 1;','const PHOTO_STORE = "photos";','zip.file("data.json",JSON.stringify(payload,null,2))','folder.file(`${p.id}.jpg`,p.blob)','state=Object.assign(defaultState(),payload.state','objectStore(PHOTO_STORE).put({id,blob,'])assert.ok(html.includes(text),text);
+  for(const text of ['const STORAGE_KEY = "gardenClimateJournal.v1";','const DB_NAME = "gardenClimateJournalDB";','const DB_VERSION = 1;','const PHOTO_STORE = "photos";','zip.file("data.json",JSON.stringify(payload,null,2))','folder.file(`${p.id}.jpg`,p.blob)','validateState(payload.state)','objectStore(PHOTO_STORE).put({id,blob,'])assert.ok(html.includes(text),text);
   // Existing and additive metadata both survive the JSON envelope used in ZIP backups.
   const records=[sample(),sample({weatherStatus:undefined,stationId:undefined,weather:{mean:8}})];
   const payload={app:'garden-climate-journal',version:'1.12.0',state:{observations:records}};

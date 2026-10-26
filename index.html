@@ -838,7 +838,7 @@
 (() => {
   "use strict";
 
-  const APP_VERSION = "1.14.1";
+  const APP_VERSION = "1.15.0";
   const STORAGE_KEY = "gardenClimateJournal.v1";
   const LAST_BACKUP_KEY = "gardenClimateJournal.lastBackup";
   const LAST_SAVE_CHECK_KEY = "gardenClimateJournal.lastVerifiedSave";
@@ -893,6 +893,27 @@
   let weatherRequestSerial = 0;
   let growthChart = null;
 
+  const SNAPSHOT_KEY = STORAGE_KEY + ".lastGood";
+  let committedRaw = loadStateRaw;
+  let draftPhotoId = "";
+  let draftReady = false;
+  let draftBlocked = new Set();
+  let draftDirty = new Set();
+  const DRAFT_KEYS = {observationForm:OBS_DRAFT_KEY,reflectionForm:STORAGE_KEY+".reflectionDraft",setupForm:STORAGE_KEY+".setupDraft"};
+  const draftBaselines = new Map();
+  const draftConflictId=uid("draft");
+  function validateState(value){
+    if(!value || typeof value!=="object" || Array.isArray(value) || !value.project || typeof value.project!=="object" || Array.isArray(value.project))throw new Error("저장 데이터의 설정 형식을 확인할 수 없습니다.");
+    for(const key of ["observations","reflections"]){
+      if(!Array.isArray(value[key]))throw new Error("저장 데이터의 기록 목록 형식이 올바르지 않습니다.");
+      const ids=new Set();
+      for(const item of value[key]){
+        if(!item || typeof item!=="object" || typeof item.id!=="string" || !item.id || ids.has(item.id))throw new Error("저장 기록의 식별자가 올바르지 않습니다.");
+        ids.add(item.id);
+      }
+    }
+    return value;
+  }
   function defaultState(){
     return {
       version: APP_VERSION,
@@ -927,7 +948,7 @@
       loadStateRaw=raw||"";
       loadStateError=null;
       if(!raw) return defaultState();
-      const parsed = JSON.parse(raw);
+      const parsed = validateState(JSON.parse(raw));
       const mergedProject=Object.assign(defaultState().project, parsed.project||{});
       if(!mergedProject.locationConfirmed && mergedProject.gardenPlace==="충남 서산시" && Number(mergedProject.latitude)===36.7845 && Number(mergedProject.longitude)===126.4503){
         mergedProject.gardenPlace=""; mergedProject.latitude=null; mergedProject.longitude=null;
@@ -962,6 +983,12 @@
     if(loadStateError){
       throw new Error("기존 저장 데이터를 읽지 못한 상태라 새 데이터로 덮어쓰지 않았습니다. 보고서의 ‘저장 상태 점검’을 확인해 주세요.");
     }
+    validateState(nextState);
+    const currentRaw=localStorage.getItem(STORAGE_KEY);
+    if(!allowConflict && currentRaw!==committedRaw){
+      externalStorageChanged=true;
+      throw new Error("다른 탭 또는 창에서 저장 데이터가 변경되었습니다. 작성 내용은 임시저장한 뒤 새로고침해 주세요.");
+    }
     if(!allowConflict){
       try{
         const stored=storedState();
@@ -974,13 +1001,17 @@
         if(error instanceof SyntaxError)throw new Error("저장된 데이터를 다시 읽지 못해 덮어쓰기를 중단했습니다.");
       }
     }
-    const next={...nextState,updatedAt:new Date().toISOString()};
+    const next={...nextState,revision:uid("revision"),updatedAt:new Date().toISOString()};
     const serialized=JSON.stringify(next);
     let checked;
     try{
+      if(currentRaw){
+        let valid=false;try{validateState(JSON.parse(currentRaw));valid=true;}catch(error){if(!allowConflict)throw error;}
+        if(valid)localStorage.setItem(SNAPSHOT_KEY,currentRaw);
+      }
       localStorage.setItem(STORAGE_KEY,serialized);
       const raw=localStorage.getItem(STORAGE_KEY);
-      if(!raw)throw new Error("저장 후 데이터를 다시 읽지 못했습니다.");
+      if(raw!==serialized)throw new Error("저장 후 데이터가 변경되었습니다. 현재 입력을 보존하고 다시 확인해 주세요.");
       checked=JSON.parse(raw);
       if(verify && !verify(checked))throw new Error("저장 후 확인 과정에서 방금 기록을 찾지 못했습니다.");
     }catch(error){
@@ -990,6 +1021,8 @@
       throw error;
     }
     state=next;
+    committedRaw=serialized;
+    loadStateRaw=serialized;
     const checkedAt=new Date().toISOString();
     try{localStorage.setItem(LAST_SAVE_CHECK_KEY,checkedAt);}catch(error){console.warn("마지막 검증시각 저장 실패",error);}
     storageHealth.localStorage=true;
@@ -2003,6 +2036,7 @@
 
   function showSetup(force=false){
     fillSetup();
+    restoreFormDraft("setupForm");
     document.getElementById("setupModal").classList.add("show");
     document.getElementById("closeSetupBtn").classList.toggle("hide",force);
   }
@@ -2014,32 +2048,87 @@
   function observationDraftData(){
     const values={};
     OBS_DRAFT_FIELDS.forEach(id=>{const el=document.getElementById(id);if(el)values[id]=el.value;});
-    return {savedAt:new Date().toISOString(),editId:document.getElementById("obsId")?.value||"",values};
+    return {savedAt:new Date().toISOString(),editId:document.getElementById("obsId")?.value||"",photoId:draftPhotoId,removePhoto:removePhotoOnSave,values};
   }
   function draftHasContent(draft){
     const v=draft?.values||{};
-    return ["heightCm","leafCount","flowerCount","fruitCount","soilState","watered","pest","changeKeyword","obsNote","weatherThought"].some(id=>String(v[id]||"").trim()!=="");
+    return !!draft?.photoId || !!draft?.editId || ["heightCm","leafCount","flowerCount","fruitCount","soilState","watered","pest","changeKeyword","obsNote","weatherThought"].some(id=>String(v[id]||"").trim()!=="");
+  }
+  function draftStatus(formId,message){
+    const form=document.getElementById(formId);if(!form)return;
+    let el=document.getElementById(formId+"DraftStatus");
+    if(!el){el=document.createElement("p");el.id=formId+"DraftStatus";el.setAttribute("role","status");el.className="subtle";form.appendChild(el);}
+    el.textContent=message;
+  }
+  function writeDraft(formId,draft){
+    if(draftBlocked.has(formId))throw new Error("기존 임시기록을 먼저 복구하거나 내려받아 주세요.");
+    const key=DRAFT_KEYS[formId],raw=localStorage.getItem(key);
+    if(draftBaselines.has(key)&&raw!==draftBaselines.get(key)){
+      const recoveryKey=key+".conflict."+draftConflictId;
+      localStorage.setItem(recoveryKey,JSON.stringify(draft));
+      throw new Error("다른 탭의 임시기록과 충돌하여 현재 입력을 별도 복구본으로 보관했습니다. 보고서에서 원본을 내려받으세요.");
+    }
+    const next=JSON.stringify(draft);localStorage.setItem(key,next);draftBaselines.set(key,next);
+    draftDirty.delete(formId);
+    draftStatus(formId,"✓ 임시저장됨 · 보관 기한 없음 · 정식 저장 전까지 유지됩니다.");
   }
   function saveObservationDraft(){
-    try{
-      const draft=observationDraftData();
-      if(draftHasContent(draft))localStorage.setItem(OBS_DRAFT_KEY,JSON.stringify(draft));
-      else localStorage.removeItem(OBS_DRAFT_KEY);
-    }catch(error){console.warn("관찰 임시저장 실패",error);}
+    if(!draftReady)return;
+    try{writeDraft("observationForm",observationDraftData());}
+    catch(error){draftStatus("observationForm","⚠ 임시저장 확인 필요: "+error.message);}
   }
-  function clearObservationDraft(){try{localStorage.removeItem(OBS_DRAFT_KEY);}catch{}}
-  function restoreObservationDraft(){
-    try{
-      const raw=localStorage.getItem(OBS_DRAFT_KEY);if(!raw)return;
-      const draft=JSON.parse(raw),age=Date.now()-new Date(draft.savedAt).getTime();
-      if(!draftHasContent(draft)||!Number.isFinite(age)||age>7*24*60*60*1000){clearObservationDraft();return;}
-      const validEditId=draft.editId&&state.observations.some(x=>x.id===draft.editId)?draft.editId:"";
-      document.getElementById("obsId").value=validEditId;
-      OBS_DRAFT_FIELDS.forEach(id=>{const el=document.getElementById(id);if(el&&draft.values?.[id]!==undefined)el.value=draft.values[id];});
-      if(validEditId)document.getElementById("cancelEditBtn").classList.remove("hide");
-      setStatus("obsStatus","📝 이전에 작성 중이던 관찰 내용을 복원했습니다. 사진은 임시저장되지 않으니 다시 확인해 주세요.","warn");
-    }catch(error){console.warn("관찰 임시기록 복원 실패",error);}
+  function clearFormDraft(formId){
+    const key=DRAFT_KEYS[formId];
+    if(localStorage.getItem(key)!==draftBaselines.get(key))return;
+    localStorage.removeItem(key);draftBaselines.set(key,null);draftDirty.delete(formId);
+    draftStatus(formId,"");
   }
+  function clearObservationDraft(){
+    clearTimeout(observationDraftTimer);
+    try{clearFormDraft("observationForm");draftPhotoId="";}catch(error){console.warn(error);}
+  }
+  function restoreFormDraft(formId){
+    const key=DRAFT_KEYS[formId];
+    try{
+      const raw=localStorage.getItem(key);draftBaselines.set(key,raw);if(!raw)return null;
+      const draft=JSON.parse(raw);
+      if(!draft || !draft.values || typeof draft.values!=="object" || Array.isArray(draft.values))throw new Error("임시기록 형식 오류");
+      const form=document.getElementById(formId);
+      for(const [id,value] of Object.entries(draft.values)){
+        const el=document.getElementById(id);
+        if(el && form.contains(el) && el.type!=="file" && typeof value==="string")el.value=value;
+      }
+      draftStatus(formId,"📝 작성 중이던 내용을 복원했습니다. 보관 기한은 없습니다.");
+      return draft;
+    }catch(error){draftBlocked.add(formId);draftStatus(formId,"⚠ 임시기록을 읽지 못했습니다. 원본은 보존했습니다. 보고서에서 원본을 내려받으세요.");return null;}
+  }
+  async function restoreObservationDraft(){
+    const draft=restoreFormDraft("observationForm");
+    if(draft){
+      document.getElementById("obsId").value=draft.editId&&state.observations.some(x=>x.id===draft.editId)?draft.editId:"";
+      removePhotoOnSave=!!draft.removePhoto;
+      if(document.getElementById("obsId").value)document.getElementById("cancelEditBtn").classList.remove("hide");
+      draftPhotoId=draft.photoId||"";
+      if(draftPhotoId){
+        try{
+          selectedPhotoBlob=await photoGet(draftPhotoId);
+          if(!selectedPhotoBlob)throw new Error("임시 사진을 찾지 못했습니다.");
+          const img=document.getElementById("photoPreview"),url=URL.createObjectURL(selectedPhotoBlob);
+          img.onload=()=>URL.revokeObjectURL(url);img.src=url;img.classList.remove("hide");
+          document.getElementById("photoPlaceholder").classList.add("hide");document.getElementById("photoTools").classList.remove("hide");
+        }catch(error){draftStatus("observationForm","⚠ "+error.message+" 텍스트는 복원했습니다.");}
+      }
+    }
+    draftReady=true;
+  }
+  function saveFormDraft(formId){
+    if(formId==="observationForm"){saveObservationDraft();return;}
+    const values={};
+    document.getElementById(formId).querySelectorAll("input[id],textarea[id],select[id]").forEach(el=>{if(el.type!=="file"&&el.type!=="checkbox")values[el.id]=el.value;});
+    try{writeDraft(formId,{savedAt:new Date().toISOString(),values});}
+    catch(error){draftStatus(formId,"⚠ "+error.message);}
+  }
+  function flushDrafts(){for(const id of draftDirty)saveFormDraft(id);}
 
   function resetObservationForm(clearDraft=true){
     weatherRequestSerial++;
@@ -2065,6 +2154,11 @@
     const o=state.observations.find(x=>x.id===id); if(!o) return;
     weatherRequestSerial++;
     removePhotoOnSave=false;
+    if(draftDirty.has("observationForm") || localStorage.getItem(OBS_DRAFT_KEY)){
+      if(!confirm("작성 중인 관찰을 버리고 이 기록을 수정할까요?"))return;
+      clearObservationDraft();
+    }
+    selectedPhotoBlob=null;draftPhotoId="";
     showPage("observe");
     document.getElementById("obsId").value=o.id;
     document.getElementById("obsDate").value=o.date;
@@ -2145,7 +2239,7 @@
           try{saveState({verify:data=>data.observations?.some(x=>x.id===id&&x.photoId===newPhotoId)});}
           catch(error){state=beforePhotoAttach;throw error;}
           photoSaved=true;
-          if(oldPhotoId&&oldPhotoId!==newPhotoId){try{await photoDelete(oldPhotoId);}catch(error){console.warn("이전 사진 정리 실패",error);}}
+          // Previous photos remain available for snapshot recovery.
           await requestPersistentStorage();
         }catch(error){
           console.error("사진 저장 실패",error);
@@ -2154,11 +2248,11 @@
           document.getElementById("cancelEditBtn").classList.remove("hide");
           setStatus("obsStatus","✅ 관찰 내용은 저장되었습니다. ⚠️ 사진만 저장하지 못했습니다: "+storageErrorMessage(error),"warn");
           toast("✅ 내용 저장 완료 · 사진 저장 실패");
-          if(typeof clearObservationDraft==="function")clearObservationDraft();
+          saveObservationDraft();
           return;
         }
       }else if(removePhotoOnSave&&oldPhotoId){
-        try{await photoDelete(oldPhotoId);}catch(error){console.warn("사진 삭제 실패",error);}
+        // Keep detached photo for recovery.
       }
       if(typeof clearObservationDraft==="function")clearObservationDraft();
       resetObservationForm(false);
@@ -2179,11 +2273,11 @@
 
   async function deleteObservation(id){
     const o=state.observations.find(x=>x.id===id); if(!o) return;
-    if(!confirm(`${o.date} 관찰 기록을 삭제할까요? 사진도 함께 삭제됩니다.`)) return;
+    if(!confirm(`${o.date} 관찰 기록을 삭제할까요? 이전 사진은 최근 정상본 복구용으로 기기에 보관됩니다.`)) return;
     try{
       const next={...state,observations:state.observations.filter(x=>x.id!==id)};
       verifiedCommit(next,{verify:data=>!data.observations?.some(x=>x.id===id)});
-      if(o.photoId){try{await photoDelete(o.photoId);}catch(error){console.warn("삭제된 기록의 사진 정리 실패",error);}}
+      // Keep photo for the previous good snapshot.
       toast("관찰 기록을 삭제했습니다.");
     }catch(error){
       console.error(error);
@@ -2209,6 +2303,7 @@
     }
     try{
       verifiedCommit({...state,reflections:[...state.reflections,r]},{verify:data=>data.reflections?.some(x=>x.id===r.id)});
+      clearFormDraft("reflectionForm");
       document.getElementById("reflectionForm").reset();
       document.getElementById("reflectDate").value=todayStr();
       toast("🧠 성찰 저장 확인 완료 +20P");
@@ -2239,6 +2334,8 @@
       state
     };
     zip.file("data.json",JSON.stringify(payload,null,2));
+    const recovery={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith("gardenClimateJournal"))recovery[key]=localStorage.getItem(key);}
+    zip.file("recovery.json",JSON.stringify(recovery,null,2));
     const folder=zip.folder("photos");
     const photos=await allPhotos();
     for(const p of photos){
@@ -2259,35 +2356,45 @@
   }
 
   async function restoreZip(file){
-    if(!file) return;
-    if(!confirm("현재 이 기기에 있는 텃밭 데이터를 지우고 ZIP 백업 내용으로 완전히 복원할까요?")) return;
+    if(!file)return;
+    const staged=[];let committed=false;
+    const originalError=loadStateError;
     try{
+      const baseline=localStorage.getItem(STORAGE_KEY);
       const zip=await JSZip.loadAsync(file);
-      const dataFile=zip.file("data.json");
-      if(!dataFile) throw new Error("data.json이 없는 백업파일입니다.");
+      const dataFile=zip.file("data.json");if(!dataFile)throw new Error("data.json이 없습니다.");
       const payload=JSON.parse(await dataFile.async("string"));
-      if(payload.app!=="garden-climate-journal" || !payload.state) throw new Error("이 앱에서 만든 백업파일이 아닙니다.");
-      await photoClear();
-      const photoFolder=zip.folder("photos");
-      const entries=[];
-      zip.forEach((relativePath,entry)=>{
-        if(!entry.dir && relativePath.startsWith("photos/") && /\.(jpg|jpeg|png|webp)$/i.test(relativePath)) entries.push(entry);
-      });
-      for(const entry of entries){
-        const blob=await entry.async("blob");
-        const id=entry.name.split("/").pop().replace(/\.(jpg|jpeg|png|webp)$/i,"");
-        await photoPut(id,blob);
+      if(payload.app!=="garden-climate-journal")throw new Error("이 앱의 백업이 아닙니다.");
+      validateState(payload.state);
+      const next=JSON.parse(JSON.stringify(payload.state)),photos=new Map();
+      for(const obs of next.observations){
+        if(!obs.photoId)continue;
+        const oldId=obs.photoId;
+        if(!photos.has(oldId)){
+          const entry=["jpg","jpeg","png","webp"].map(ext=>zip.file("photos/"+oldId+"."+ext)).find(Boolean);
+          if(!entry)throw new Error("백업에 연결된 사진이 없습니다: "+oldId);
+          const blob=await entry.async("blob");if(!blob.size)throw new Error("빈 사진이 있습니다.");
+          photos.set(oldId,{id:uid("restoredphoto"),blob});
+        }
+        obs.photoId=photos.get(oldId).id;
       }
-      state=Object.assign(defaultState(),payload.state,{project:Object.assign(defaultState().project,payload.state.project||{})});
-      loadStateError=null;loadStateRaw="";externalStorageChanged=false;
-      verifiedCommit(state,{allowConflict:true,verify:data=>Array.isArray(data.observations)&&Array.isArray(data.reflections)});
-      clearObservationDraft();
-      fillSetup();
-      toast(`복원 완료: 사진 ${entries.length}장`);
-    }catch(err){
-      console.error(err);
-      alert("복원에 실패했습니다.\n"+err.message);
+      if(!confirm("검증한 백업의 관찰 "+next.observations.length+"개, 성찰 "+next.reflections.length+"개로 교체할까요? 기존 정상본과 사진은 복구용으로 보관합니다."))return;
+      for(const photo of photos.values()){
+        staged.push(photo.id);await photoPut(photo.id,photo.blob);
+        if(!await verifyPhotoSaved(photo.id))throw new Error("사진 저장 확인 실패");
+      }
+      if(localStorage.getItem(STORAGE_KEY)!==baseline)throw new Error("복원 중 다른 탭에서 변경되었습니다. 현재 기록을 보존하고 복원을 중단했습니다.");
+      if(baseline)localStorage.setItem(STORAGE_KEY+".beforeRestore",baseline);
+      loadStateError=null;
+      verifiedCommit(next,{allowConflict:true,verify:data=>data.observations.length===next.observations.length&&data.reflections.length===next.reflections.length});
+      committed=true;
+      fillSetup();restoreFormDraft("setupForm");
+      toast("복원 완료 · 작성 중인 임시기록도 보존했습니다.");
+    }catch(error){
+      if(!committed){loadStateError=originalError;}
+      alert("복원하지 못했습니다. 기존 기록과 사진을 유지했습니다.\n"+error.message);
     }finally{
+      if(!committed)for(const id of staged){try{await photoDelete(id);}catch{}}
       document.getElementById("restoreZipInput").value="";
     }
   }
@@ -2361,6 +2468,11 @@
     const answer=prompt(`모든 텃밭 데이터와 사진을 이 기기에서 완전히 삭제합니다.\n되돌릴 수 없습니다.\n계속하려면 "${text}"라고 입력하세요.`);
     if(answer!==text) return;
     await photoClear();
+    const journalKeys=[];
+    for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith("gardenClimateJournal"))journalKeys.push(key);}
+    journalKeys.forEach(key=>localStorage.removeItem(key));
+    committedRaw=null;draftBaselines.clear();draftBlocked.clear();draftDirty.clear();draftPhotoId="";
+    for(const key of Object.values(DRAFT_KEYS))draftBaselines.set(key,null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(LAST_BACKUP_KEY);
     localStorage.removeItem(LAST_SAVE_CHECK_KEY);
@@ -2468,6 +2580,7 @@
       weatherRequestSerial++;
       currentWeatherForObservation=null;
       renderWeatherTo("ow",null);
+      clearFormDraft("setupForm");
       hideSetup();toast("✅ 프로젝트 설정 저장 확인 완료");
       void requestPersistentStorage();loadTodayWeather();
     }catch(error){
@@ -2483,13 +2596,16 @@
     try{
       selectedPhotoBlob=await compressImage(file);
       removePhotoOnSave=false;
+      const pendingPhotoId=uid("draftphoto");
+      await photoPut(pendingPhotoId,selectedPhotoBlob);
+      draftPhotoId=pendingPhotoId;saveObservationDraft();
       const url=URL.createObjectURL(selectedPhotoBlob);
       const img=document.getElementById("photoPreview");
       img.onload=()=>setTimeout(()=>URL.revokeObjectURL(url),1000);
       img.src=url; img.classList.remove("hide");
       document.getElementById("photoPlaceholder").classList.add("hide");
       document.getElementById("photoTools").classList.remove("hide");
-      stateEl.textContent=`✅ 사진 준비 완료 · ${(selectedPhotoBlob.size/1024).toFixed(0)}KB · 기록 저장 버튼을 누르면 기기에 저장됩니다.`;
+      stateEl.textContent=`✅ 사진 임시보관 완료 · ${(selectedPhotoBlob.size/1024).toFixed(0)}KB · 기록 저장 버튼으로 확정하세요.`;
       stateEl.className="photo-save-state show ok";
       toast("📸 사진 준비 완료");
     }catch(err){
@@ -2504,6 +2620,7 @@
   document.getElementById("removeSelectedPhoto").addEventListener("click",()=>{
     selectedPhotoBlob=null;
     removePhotoOnSave=!!document.getElementById("obsId").value;
+    draftPhotoId="";saveObservationDraft();
     document.getElementById("photoPreview").src="";
     document.getElementById("photoPreview").classList.add("hide");
     document.getElementById("photoPlaceholder").classList.remove("hide");
@@ -2549,7 +2666,7 @@
   }
   document.getElementById("refreshTodayWeather").addEventListener("click",loadTodayWeather);
   document.getElementById("observationForm").addEventListener("submit",saveObservation);
-  document.getElementById("cancelEditBtn").addEventListener("click",resetObservationForm);
+  document.getElementById("cancelEditBtn").addEventListener("click",()=>{saveObservationDraft();showPage("home");toast("수정 중인 내용은 임시저장했습니다.");});
 
   document.getElementById("observationTimeline").addEventListener("click",e=>{
     const edit=e.target.closest(".edit-observation"), del=e.target.closest(".delete-observation");
@@ -2566,20 +2683,50 @@
   document.getElementById("generatePdfBtn").addEventListener("click",generatePDF);
   document.getElementById("printReportBtn").addEventListener("click",printReport);
   document.getElementById("deleteAllBtn").addEventListener("click",deleteAll);
+  const recoveryButton=document.createElement("button");recoveryButton.type="button";recoveryButton.className="btn small outline";recoveryButton.textContent="저장 원본·복구본 내려받기";
+  recoveryButton.addEventListener("click",()=>{
+    const values={};for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith("gardenClimateJournal"))values[key]=localStorage.getItem(key);}
+    downloadBlob(new Blob([JSON.stringify(values,null,2)],{type:"application/json"}),"garden-recovery.json");
+  });document.getElementById("runStorageCheckBtn").parentElement.appendChild(recoveryButton);
+  const recoverButton=document.createElement("button");recoverButton.type="button";recoverButton.className="btn small outline";recoverButton.textContent="최근 정상 기록 복구";
+  recoverButton.addEventListener("click",()=>{
+    try{
+      const raw=localStorage.getItem(SNAPSHOT_KEY);if(!raw)throw new Error("보관된 정상 기록이 없습니다.");
+      const restored=validateState(JSON.parse(raw));
+      if(!confirm("최근 정상본의 관찰 "+restored.observations.length+"개와 성찰 "+restored.reflections.length+"개로 복구할까요? 현재 원본도 별도 보관합니다."))return;
+      const current=localStorage.getItem(STORAGE_KEY);if(current)localStorage.setItem(STORAGE_KEY+".recovery."+Date.now(),current);
+      const previousError=loadStateError;loadStateError=null;
+      try{verifiedCommit(restored,{allowConflict:true});}catch(error){loadStateError=previousError;throw error;}
+      toast("최근 정상 기록을 복구했습니다.");
+    }catch(error){alert("복구하지 못했습니다: "+error.message);}
+  });recoveryButton.parentElement.appendChild(recoverButton);
   document.getElementById("runStorageCheckBtn").addEventListener("click",()=>runStorageDiagnostics({requestPersist:true,notify:true}));
   document.getElementById("copyStorageCheckBtn").addEventListener("click",copyStorageDiagnostics);
   document.getElementById("backupReminderBtn").addEventListener("click",()=>showPage("report"));
 
+  for(const formId of Object.keys(DRAFT_KEYS)){
+    const form=document.getElementById(formId);
+    if(formId!=="observationForm")for(const event of ["input","change"])form.addEventListener(event,()=>{draftDirty.add(formId);saveFormDraft(formId);});
+    const button=document.createElement("button");button.type="button";button.className="btn small outline";button.textContent="작성 내용 버리기";
+    button.addEventListener("click",()=>{
+      if(!confirm("이 화면에서 작성 중인 내용을 버릴까요? 저장 완료한 기록은 유지됩니다."))return;
+      draftBlocked.delete(formId);draftBaselines.set(DRAFT_KEYS[formId],localStorage.getItem(DRAFT_KEYS[formId]));clearFormDraft(formId);
+      if(formId==="observationForm"){clearTimeout(observationDraftTimer);draftPhotoId="";resetObservationForm();}else if(formId==="setupForm")fillSetup();else {form.reset();document.getElementById("reflectDate").value=todayStr();}
+    });form.appendChild(button);
+  }
   const observationForm=document.getElementById("observationForm");
   const queueObservationDraft=()=>{
     clearTimeout(observationDraftTimer);
-    observationDraftTimer=setTimeout(saveObservationDraft,650);
+    draftDirty.add("observationForm");
+    observationDraftTimer=setTimeout(saveObservationDraft,250);
   };
   observationForm.addEventListener("input",e=>{if(e.target.type!=="file")queueObservationDraft();});
   observationForm.addEventListener("change",e=>{if(e.target.type!=="file")queueObservationDraft();});
 
   window.addEventListener("storage",e=>{
-    if(e.key!==STORAGE_KEY||!e.newValue)return;
+    if(e.key!==STORAGE_KEY && e.key!==null)return;
+    if(e.newValue!==committedRaw){externalStorageChanged=true;storageHealth.lastError="다른 탭에서 데이터가 변경 또는 삭제되었습니다. 입력 내용을 임시저장하고 새로고침해 주세요.";renderStorageHealth();}
+    if(!e.newValue)return;
     try{
       const incoming=JSON.parse(e.newValue);
       if(incoming?.updatedAt&&state?.updatedAt&&new Date(incoming.updatedAt).getTime()>new Date(state.updatedAt).getTime()){
@@ -2592,26 +2739,29 @@
   });
 
   document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="hidden")flushDrafts();
     if(document.visibilityState==="visible")void syncPendingObservationWeather();
   });
+  window.addEventListener("pagehide",flushDrafts);
   window.addEventListener("pageshow",()=>void syncPendingObservationWeather());
 
   document.getElementById("obsDate").value=todayStr();
   document.getElementById("reflectDate").value=todayStr();
 
   if("serviceWorker" in navigator){
-    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=27", { scope: "/school-garden/" }).catch(()=>{}));
+    window.addEventListener("load",()=>navigator.serviceWorker.register("/school-garden/service-worker.js?v=28", { scope: "/school-garden/" }).catch(()=>{}));
   }
 
   renderAll();
-  restoreObservationDraft();
+  void restoreObservationDraft();
+  restoreFormDraft("reflectionForm");
   if(loadStateError){
     storageHealth.lastError="기존 저장 데이터를 읽지 못했습니다. 기존 값을 보호하기 위해 새 기록으로 덮어쓰지 않습니다.";
     renderStorageHealth();
     setTimeout(()=>alert("⚠️ 이 기기의 기존 텃밭 기록을 읽지 못했습니다.\n기존 데이터를 보호하기 위해 새 저장을 막아 두었습니다.\n보고서 → 데이터 관리 → 저장 상태 점검을 확인해 주세요."),150);
   }
   void runStorageDiagnostics({requestPersist:false,notify:false});
-  if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(true);
+  if(!state.project.cropName || !state.project.plantDate || !validAsosStation(state.project.stationId)) showSetup(!loadStateRaw && !loadStateError);
   else loadTodayWeather();
   void syncPendingObservationWeather();
 

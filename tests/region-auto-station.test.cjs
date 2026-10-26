@@ -42,9 +42,9 @@ assert.ok(html.includes('verifiedCommit({...state,project}'));
 assert.ok(html.includes('지역 저장 확인 완료'));
 console.log("PASS: no manual station selector; explicit search + region save UI");
 
-assert.ok(html.includes('const APP_VERSION = "1.14.1";'));
-assert.ok(html.includes('service-worker.js?v=27'));
-assert.ok(sw.includes('const CACHE = "school-garden-v18";'));
+assert.ok(html.includes('const APP_VERSION = "1.15.0";'));
+assert.ok(html.includes('service-worker.js?v=28'));
+assert.ok(sw.includes('const CACHE = "school-garden-v19";'));
 assert.ok(html.includes('const STORAGE_KEY = "gardenClimateJournal.v1";'));
 assert.ok(html.includes('const DB_NAME = "gardenClimateJournalDB";'));
 assert.ok(html.includes('const PHOTO_STORE = "photos";'));
